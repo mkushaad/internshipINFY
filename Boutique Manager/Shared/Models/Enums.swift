@@ -43,12 +43,17 @@ enum VIPTier: String, Codable {
 }
 
 enum ProductCategory: String, Codable {
-    case handbags = "Handbags"
-    case fragrances = "Fragrances"
-    case accessories = "Accessories"
-    case jewellery = "Jewellery"
-    case watches = "Watches"
-    case footware = "Footware"
+    case apparel
+    case footwear
+    case accessories
+    case jewelry
+    case cosmetics
+    
+    // Database aligned categories
+    case bag = "Bag"
+    case perfume = "Perfume"
+    case wallet = "Wallet"
+    case ring = "Ring"
     case general = "General"
 
     init(from decoder: Decoder) throws {
@@ -56,7 +61,7 @@ enum ProductCategory: String, Codable {
         let raw = (try? container.decode(String.self)) ?? ""
         if let exact = ProductCategory(rawValue: raw) {
             self = exact
-        } else if let lower = ProductCategory(rawValue: raw.capitalized) {
+        } else if let lower = ProductCategory(rawValue: raw.lowercased()) {
             self = lower
         } else {
             self = .general
@@ -83,12 +88,20 @@ enum AppointmentStatus: String, Codable {
     case noShow
 }
 
-enum TransferRequestStatus: String, Codable {
+enum TransferRequestStatus: String, Codable, CaseIterable {
     case pending
-    case approved
-    case rejected
-    case inTransit
-    case completed
+    case cancelled
+    case accepted
+    case declined
+
+    var displayName: String {
+        switch self {
+        case .pending: return "Pending"
+        case .cancelled: return "Cancelled"
+        case .accepted: return "Accepted"
+        case .declined: return "Declined"
+        }
+    }
 }
 
 enum InventoryTransferStatus: String, Codable {
@@ -183,6 +196,24 @@ enum ShiftType: String, Codable {
         case .morning: return "9:00 AM - 2:00 PM"
         case .evening: return "2:00 PM - 7:00 PM"
         case .leave: return "On Leave"
+        }
+    }
+}
+
+enum StoreRequestStatus: String, Codable, CaseIterable {
+
+    case pending = "pending"
+    case fulfilled = "fulfilled"
+    case rejected = "rejected"
+
+    var displayName: String {
+        switch self {
+        case .pending:
+            return "Pending"
+        case .fulfilled:
+            return "Fulfilled"
+        case .rejected:
+            return "Rejected"
         }
     }
 }

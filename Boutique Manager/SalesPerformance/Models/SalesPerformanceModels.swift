@@ -23,7 +23,6 @@ struct DailySalesTrend: Identifiable {
     let day: String
     let target: Double
     let actual: Double
-    var isFuture: Bool = false
 }
 
 enum DailyStatus: String, CaseIterable {
@@ -63,6 +62,22 @@ struct StoreKPI: Identifiable {
     let iconName: String
 }
 
+struct SalesAssociatePerformance: Identifiable {
+    let id = UUID()
+    let name: String
+    let imageName: String
+    let weeklySales: String
+    let achievementPercentage: Double
+}
+
+struct AssociateNeedingAttention: Identifiable {
+    let id = UUID()
+    let name: String
+    let imageName: String
+    let achievementPercentage: Double
+    let reason: String
+}
+
 struct CategorySalesShare: Identifiable {
     let id = UUID()
     let category: ProductCategory
@@ -78,13 +93,18 @@ struct BestSellingProduct: Identifiable {
     let revenue: String
 }
 
-struct DetailedSaleItem: Identifiable, Equatable {
+struct MissedOpportunity: Identifiable {
     let id = UUID()
-    let productName: String
-    let category: ProductCategory
-    let date: Date
-    let units: Int
-    let amount: Double
+    let title: String
+    let subtitle: String
+    let estimatedRevenueLoss: String
+    let iconName: String
+}
+
+struct AIRecommendation: Identifiable {
+    let id = UUID()
+    let title: String
+    let impactText: String
     let iconName: String
 }
 
@@ -93,12 +113,21 @@ struct PerformanceComparison: Identifiable {
     let period: String
     let percentageChange: Double
     let percentageString: String
-    var isDataAvailable: Bool = true
 }
 
-struct PeakHourData: Identifiable {
+struct PendingActionItem: Identifiable {
     let id = UUID()
-    let period: String // e.g., "Morning", "Afternoon", "Evening"
-    let revenue: Double
-    let color: Color
+    let title: String
+    let iconName: String
+}
+
+
+struct DetailedSaleItem: Identifiable, Equatable {
+    let id = UUID()
+    let productName: String
+    let category: ProductCategory
+    let date: Date
+    let units: Int
+    let amount: Double
+    let iconName: String
 }
