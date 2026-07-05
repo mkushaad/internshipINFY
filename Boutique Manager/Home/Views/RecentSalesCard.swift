@@ -7,94 +7,124 @@
 
 import SwiftUI
 
-struct RecentSaleItem {
+struct RecentSaleItem: Identifiable {
+    let id = UUID()
     let name: String
     let category: String
     let timeAgo: String
     let price: Double
 }
 
-struct RecentSalesCard: View {
+struct RecentSalesSection: View {
     let items: [RecentSaleItem]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 12) {
             
-            // Header
-            HStack(spacing: 4) {
-                Image(systemName: "bag.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(.themeAccent) 
+            // Section Header
+            HStack {
                 Text("Recent Sales")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                 Spacer()
+                Button(action: {}) {
+                    Text("See All")
+                        .font(.subheadline)
+                        .foregroundColor(.themeAccent)
+                }
             }
-            .padding(.bottom, 8)
 
-            // Sales rows
-            VStack(spacing: 8) {
+            // Rows
+            VStack(spacing: 0) {
                 if items.isEmpty {
-                    Text("No sales as of now")
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
-                        .padding(.vertical, 30)
+                    VStack(spacing: 6) {
+                        Image(systemName: "bag")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                        Text("No recent sales to show")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
                 } else {
-                    ForEach(items.indices, id: \.self) { i in
-                        RecentSaleRow(item: items[i])
-                        if i < items.count - 1 {
+                    ForEach(items.indices, id: \.self) { index in
+                        RecentSaleRow(item: items[index])
+                        
+                        if index < items.count - 1 {
                             Divider()
-                            .background(Color.themeText.opacity(0.1))
+                                .padding(.leading, 68)
                         }
                     }
                 }
             }
-            
-            Spacer(minLength: 0)
+            .background(Color.themeCard)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: Color.black.opacity(0.04), radius: 12, x: 0, y: 6)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 170, maxHeight: .infinity, alignment: .top)
-        .background(Color.themeCard)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
     }
 }
 
 struct RecentSaleRow: View {
     let item: RecentSaleItem
+    
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(spacing: 14) {
+            // Category Icon
+            Image(systemName: categoryIcon)
+                .font(.body)
+                .foregroundColor(.themeAccent)
+                .frame(width: 36, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.themeAccent.opacity(0.10))
+                )
+            
+            // Details
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.themeText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(item.category)
-                    .font(.system(size: 10))
-                    .foregroundColor(.gray)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                
+                Text("\(item.category) · \(item.timeAgo)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "$%.0f", item.price))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.themeAccent)
-                Text(item.timeAgo)
-                    .font(.system(size: 9))
-                    .foregroundColor(.gray)
-            }
+            
+            Spacer()
+            
+            // Price
+            Text(String(format: "$%.0f", item.price))
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+    
+    private var categoryIcon: String {
+        switch item.category.lowercased() {
+        case "bag", "bags", "handbags": return "bag.fill"
+        case "apparel", "clothing": return "tshirt.fill"
+        case "footwear", "shoes": return "shoe.fill"
+        case "jewelry": return "diamond.fill"
+        case "accessories": return "eyeglasses"
+        case "wallet", "wallets": return "creditcard.fill"
+        case "cosmetics": return "wand.and.stars"
+        case "perfume": return "drop.fill"
+        default: return "bag.fill"
         }
     }
 }
 
 #Preview {
-    ZStack {
-        Color.themeBackground.ignoresSafeArea()
-        RecentSalesCard(items: [
-            RecentSaleItem(name: "Mock Item", category: "Bag", timeAgo: "2m", price: 2500)
-        ])
-    }
+    RecentSalesSection(items: [
+        RecentSaleItem(name: "Classic Monogram Tote", category: "Handbags", timeAgo: "2h ago", price: 2500),
+        RecentSaleItem(name: "Silk Evening Gown", category: "Apparel", timeAgo: "5h ago", price: 4200),
+        RecentSaleItem(name: "Classic Wallet", category: "Wallet", timeAgo: "1d ago", price: 33000)
+    ])
+    .padding()
+    .background(Color.themeBackground)
 }

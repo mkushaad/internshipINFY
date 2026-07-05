@@ -24,6 +24,9 @@ class SalesPerformanceViewModel: ObservableObject {
         achievementPercentage: 0.0
     )
     
+    // Section 11: Performance Comparison
+    @Published var comparisons: [PerformanceComparison] = []
+    
     // Section 2: Sales Trend
     @Published var salesTrends: [DailySalesTrend] = []
     
@@ -33,11 +36,7 @@ class SalesPerformanceViewModel: ObservableObject {
     // Section 4: Store KPIs
     @Published var storeKPIs: [StoreKPI] = []
     
-    // Section 5: Top Performing Sales Associates
-    @Published var topPerformers: [SalesAssociatePerformance] = []
-    
-    // Section 6: Associates Needing Attention
-    @Published var needingAttention: [AssociateNeedingAttention] = []
+
     
     // Section 7: Sales by Category
     @Published var categorySales: [CategorySalesShare] = []
@@ -45,35 +44,20 @@ class SalesPerformanceViewModel: ObservableObject {
     // Section 8: Best Selling Products
     @Published var bestSellers: [BestSellingProduct] = []
     
-    // Section 9: Missed Opportunities
-    @Published var missedOpportunities: [MissedOpportunity] = [
-        MissedOpportunity(title: "Out of Stock", subtitle: "12 lost sales", estimatedRevenueLoss: "₹14.5L", iconName: "exclamationmark.triangle.fill"),
-        MissedOpportunity(title: "Customer Left Without Purchase", subtitle: "8 lost sales", estimatedRevenueLoss: "₹8.2L", iconName: "person.fill.xmark"),
-        MissedOpportunity(title: "Transfer Pending", subtitle: "6 pending", estimatedRevenueLoss: "₹4.5L", iconName: "arrow.left.arrow.right")
-    ]
+    // Peak Hours Analysis
+    @Published var peakHoursToday: [PeakHourData] = []
+    @Published var peakHoursYesterday: [PeakHourData] = []
+    @Published var peakHoursThisWeek: [PeakHourData] = []
     
-    // Section 10: AI Recommendations
-    @Published var aiRecommendations: [AIRecommendation] = [
-        AIRecommendation(title: "Move 4 Rolex Daytonas from Dubai Boutique", impactText: "Potential Revenue +₹12L", iconName: "sparkles"),
-        AIRecommendation(title: "Increase Leather Goods Display", impactText: "Potential Revenue +₹8.5L", iconName: "sparkles"),
-        AIRecommendation(title: "Promote VIP Follow-up Campaign", impactText: "Expected Conversion +9%", iconName: "sparkles")
-    ]
-    
-    // Section 11: Performance Comparison
-    @Published var comparisons: [PerformanceComparison] = []
-    
-    // Section 12: Pending Actions
-    @Published var pendingActions: [PendingActionItem] = [
-        PendingActionItem(title: "Approve Stock Transfer", iconName: "checkmark.circle.fill"),
-        PendingActionItem(title: "Review Low Stock Alerts", iconName: "bell.fill"),
-        PendingActionItem(title: "Assign VIP Client", iconName: "person.2.fill"),
-        PendingActionItem(title: "Approve Inventory Discrepancy", iconName: "doc.text.fill")
-    ]
+    // All Sales List
+    @Published var detailedSalesList: [DetailedSaleItem] = []
+
     
     // Fetched Sales Data
     @Published var mockSales: [Sale] = []
     @Published var mockSalesItems: [SalesItem] = []
     @Published var mockProducts: [Product] = []
+    @Published var mockAssociates: [User] = []
     
     var saleDisplays: [SaleDisplayData] {
         mockSales.map { sale in
@@ -106,88 +90,40 @@ class SalesPerformanceViewModel: ObservableObject {
         return calendar.date(byAdding: .day, value: daysOffset, to: startOfCurrentWeek) ?? Date()
     }
     
-    var detailedSalesList: [DetailedSaleItem] {
-        return mockSalesItems.compactMap { item in
-            guard let sale = mockSales.first(where: { $0.id == item.saleID }),
-                  let product = mockProducts.first(where: { $0.id == item.productID }) else {
-                return nil
-            }
-            
-            let iconName: String
-            switch product.category {
-            case .bag: iconName = "handbag.fill"
-            case .perfume: iconName = "drop.fill"
-            case .wallet: iconName = "creditcard.fill"
-            case .ring: iconName = "sparkles"
-            default: iconName = "cube.box.fill"
-            }
-            
-            return DetailedSaleItem(
-                productName: product.name,
-                category: product.category,
-                date: sale.saleDate,
-                units: item.quantity,
-                amount: item.subTotal,
-                iconName: iconName
-            )
-        }.sorted { $0.date > $1.date }
+    init() {
+        // Data is now fetched asynchronously via fetchSalesData
     }
-    
-    private func computePeakHours(for datePredicate: (Date) -> Bool) -> [PeakHourData] {
-        let relevantSales = mockSales.filter { datePredicate($0.saleDate) }
-        var hourRevenue: [Int: Double] = [:]
-        let calendar = Calendar.current
-        for sale in relevantSales {
-            let hour = calendar.component(.hour, from: sale.saleDate)
-            hourRevenue[hour, default: 0] += sale.totalAmount
-        }
-        
-        let sortedHours = hourRevenue.keys.sorted()
-        return sortedHours.map { hour in
-            let amPm = hour < 12 ? "AM" : "PM"
-            let displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour)
-            return PeakHourData(period: "\(displayHour) \(amPm)", revenue: hourRevenue[hour] ?? 0.0)
-        }
-    }
-    
-    var peakHoursYesterday: [PeakHourData] {
-        let calendar = Calendar.current
-        return computePeakHours { calendar.isDateInYesterday($0) }
-    }
-    
-    var peakHoursToday: [PeakHourData] {
-        let calendar = Calendar.current
-        return computePeakHours { calendar.isDateInToday($0) }
-    }
-    
-    var peakHoursThisWeek: [PeakHourData] {
-        return computePeakHours { _ in true } // uses all mockSales currently fetched for the selected week
-    }
-    
-    init() {}
     
     func selectWeek(_ week: String, customWeeklyTarget: Double? = nil, storeID: UUID) {
         selectedWeek = week
+        let start = startDate(for: week)
         Task {
-            await fetchSalesData(forStoreID: storeID, week: week, customWeeklyTarget: customWeeklyTarget)
+            await fetchSalesData(forStoreID: storeID, start: start, weekLabel: week.split(separator: " ").prefix(2).joined(separator: " "), customWeeklyTarget: customWeeklyTarget)
         }
     }
     
-    func fetchSalesData(forStoreID storeID: UUID, week: String, customWeeklyTarget: Double? = nil) async {
+    func selectDate(_ date: Date, customWeeklyTarget: Double? = nil, storeID: UUID) {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        components.weekday = 2 // Monday
+        let start = calendar.date(from: components) ?? date
+        Task {
+            await fetchSalesData(forStoreID: storeID, start: start, referenceDate: date, weekLabel: "Custom Week", customWeeklyTarget: customWeeklyTarget)
+        }
+    }
+    
+    private func fetchSalesData(forStoreID storeID: UUID, start: Date, referenceDate: Date? = nil, weekLabel: String, customWeeklyTarget: Double? = nil) async {
         isLoading = true
         errorMessage = nil
-        selectedWeek = week
         
-        let start = startDate(for: week)
         let calendar = Calendar.current
         let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
         
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        navigationSubtitle = "\(week.split(separator: " ").prefix(2).joined(separator: " ")) • \(formatter.string(from: start)) – \(formatter.string(from: end))"
+        navigationSubtitle = "\(weekLabel) • \(formatter.string(from: start)) – \(formatter.string(from: end))"
         
-        loadMockCards(for: week)
-        
+
         do {
             let dateFormatter = ISO8601DateFormatter()
             dateFormatter.formatOptions = [.withFullDate]
@@ -207,6 +143,19 @@ class SalesPerformanceViewModel: ObservableObject {
             
             let saleIDs = fetchedSales.map { $0.id.uuidString }
             if !saleIDs.isEmpty {
+                let associateIDs = Set(fetchedSales.map { $0.salesAssociateID.uuidString })
+                if !associateIDs.isEmpty {
+                    let fetchedAssociates: [User] = try await SupabaseService.shared.client
+                        .from("User")
+                        .select()
+                        .in("id", values: Array(associateIDs))
+                        .execute()
+                        .value
+                    self.mockAssociates = fetchedAssociates
+                } else {
+                    self.mockAssociates = []
+                }
+                
                 let fetchedItems: [SalesItem] = try await SupabaseService.shared.client
                     .from("SalesItem")
                     .select()
@@ -231,9 +180,10 @@ class SalesPerformanceViewModel: ObservableObject {
             } else {
                 self.mockSalesItems = []
                 self.mockProducts = []
+                self.mockAssociates = []
             }
             
-            calculateMetrics(for: week, customWeeklyTarget: customWeeklyTarget, start: start)
+            calculateMetrics(customWeeklyTarget: customWeeklyTarget, start: start, referenceDate: referenceDate)
             self.isLoading = false
             
         } catch {
@@ -241,56 +191,13 @@ class SalesPerformanceViewModel: ObservableObject {
             self.isLoading = false
             print("Error fetching sales: \(error)")
             // Provide fallback calculations with empty data
-            calculateMetrics(for: week, customWeeklyTarget: customWeeklyTarget, start: start)
+            calculateMetrics(customWeeklyTarget: customWeeklyTarget, start: start, referenceDate: referenceDate)
         }
     }
     
-    private func loadMockCards(for week: String) {
-        // Keep the mock data for VIP appointments, top performers, etc.
-        switch week {
-        case "Week 23":
-            topPerformers = [
-                SalesAssociatePerformance(name: "John", imageName: "person.circle.fill", weeklySales: "₹14.2L", achievementPercentage: 135.0),
-                SalesAssociatePerformance(name: "Sophia", imageName: "person.circle.fill", weeklySales: "₹11.5L", achievementPercentage: 118.0),
-                SalesAssociatePerformance(name: "Emma", imageName: "person.circle.fill", weeklySales: "₹10.1L", achievementPercentage: 105.0)
-            ]
-            needingAttention = [
-                AssociateNeedingAttention(name: "David", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 68.0, reason: "Improving"),
-                AssociateNeedingAttention(name: "Lucas", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 58.0, reason: "Low Client Outreach")
-            ]
-        case "Week 22":
-            topPerformers = [
-                SalesAssociatePerformance(name: "Sophia", imageName: "person.circle.fill", weeklySales: "₹15.0L", achievementPercentage: 142.0),
-                SalesAssociatePerformance(name: "Emma", imageName: "person.circle.fill", weeklySales: "₹12.2L", achievementPercentage: 125.0),
-                SalesAssociatePerformance(name: "David", imageName: "person.circle.fill", weeklySales: "₹9.8L", achievementPercentage: 102.0)
-            ]
-            needingAttention = [
-                AssociateNeedingAttention(name: "Oliver", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 60.0, reason: "Product Knowledge")
-            ]
-        case "Week 21":
-            topPerformers = [
-                SalesAssociatePerformance(name: "Emma", imageName: "person.circle.fill", weeklySales: "₹13.1L", achievementPercentage: 138.0),
-                SalesAssociatePerformance(name: "John", imageName: "person.circle.fill", weeklySales: "₹11.2L", achievementPercentage: 122.0),
-                SalesAssociatePerformance(name: "Lucas", imageName: "person.circle.fill", weeklySales: "₹9.5L", achievementPercentage: 108.0)
-            ]
-            needingAttention = [
-                AssociateNeedingAttention(name: "Sophia", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 72.0, reason: "On Leave Partial Week"),
-                AssociateNeedingAttention(name: "David", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 64.0, reason: "Low Add-on Sales")
-            ]
-        default:
-            topPerformers = [
-                SalesAssociatePerformance(name: "Emma", imageName: "person.circle.fill", weeklySales: "₹12.4L", achievementPercentage: 143.0),
-                SalesAssociatePerformance(name: "John", imageName: "person.circle.fill", weeklySales: "₹10.8L", achievementPercentage: 120.0),
-                SalesAssociatePerformance(name: "Sophia", imageName: "person.circle.fill", weeklySales: "₹9.3L", achievementPercentage: 111.0)
-            ]
-            needingAttention = [
-                AssociateNeedingAttention(name: "David", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 62.0, reason: "Training Recommended"),
-                AssociateNeedingAttention(name: "Oliver", imageName: "person.crop.circle.badge.exclamationmark", achievementPercentage: 55.0, reason: "Low Conversion Rate")
-            ]
-        }
-    }
+
     
-    private func calculateMetrics(for week: String, customWeeklyTarget: Double?, start: Date) {
+    private func calculateMetrics(customWeeklyTarget: Double?, start: Date, referenceDate: Date? = nil) {
         var weeklyTargetAmount: Double = customWeeklyTarget ?? 8500000
         var dailyTargets: [Double] = [8.0, 8.0, 8.0, 10.0, 12.0, 20.0, 19.0]
         
@@ -363,17 +270,15 @@ class SalesPerformanceViewModel: ObservableObject {
         self.salesTrends = trends
         self.dailySalesBreakdown = breakdowns
         
-        let categories: [ProductCategory] = [.bag, .perfume, .wallet, .ring, .apparel, .footwear, .jewelry, .accessories, .cosmetics]
+        let categories: [ProductCategory] = [.handbags, .fragrances, .accessories, .footware, .general, .jewellery, .watches]
         let categoryColors: [ProductCategory: Color] = [
-            .bag: Color.boutiqueGold,
-            .perfume: Color.purple,
-            .wallet: Color.brown,
-            .ring: Color.orange,
-            .apparel: Color.boutiqueGold,
-            .footwear: Color.brown,
-            .jewelry: Color.orange,
+            .handbags: Color.boutiqueGold,
+            .fragrances: Color.purple,
             .accessories: Color.gray,
-            .cosmetics: Color.purple
+            .jewellery: Color.orange,
+            .watches: Color.blue,
+            .footware: Color.brown,
+            .general: Color.black
         ]
         
         var catSales: [CategorySalesShare] = []
@@ -395,26 +300,22 @@ class SalesPerformanceViewModel: ObservableObject {
         let avgOrderValue = ordersCount > 0 ? totalAchieved / Double(ordersCount) : 0
         let avgString = formatter.string(from: NSNumber(value: avgOrderValue)) ?? "0"
         
-        let vipConversion = {
-            switch week {
-            case "Week 23": return "82%"
-            case "Week 22": return "75%"
-            case "Week 21": return "79%"
-            default: return "78%"
-            }
-        }()
-        
         let unitsSold = mockSalesItems.reduce(0) { $0 + $1.quantity }
+        
+        let itemsPerOrder = ordersCount > 0 ? Double(unitsSold) / Double(ordersCount) : 0
+        let itemsPerOrderString = String(format: "%.1f", itemsPerOrder)
         
         self.storeKPIs = [
             StoreKPI(title: "Orders", value: "\(ordersCount)", iconName: "bag.fill"),
             StoreKPI(title: "Average Order Value", value: "₹\(avgString)", iconName: "creditcard.fill"),
-            StoreKPI(title: "VIP Conversion", value: vipConversion, iconName: "star.fill"),
+            StoreKPI(title: "Items per Order", value: itemsPerOrderString, iconName: "chart.bar.fill"),
             StoreKPI(title: "Units Sold", value: "\(unitsSold)", iconName: "cube.box.fill")
         ]
         
-        let todayTotal = mockSales.filter { calendar.isDateInToday($0.saleDate) }.reduce(0) { $0 + $1.totalAmount }
-        let yesterdayTotal = mockSales.filter { calendar.isDateInYesterday($0.saleDate) }.reduce(0) { $0 + $1.totalAmount }
+        let targetDay = referenceDate ?? Date()
+        let yesterdayDay = calendar.date(byAdding: .day, value: -1, to: targetDay) ?? targetDay
+        let todayTotal = mockSales.filter { calendar.isDate($0.saleDate, inSameDayAs: targetDay) }.reduce(0) { $0 + $1.totalAmount }
+        let yesterdayTotal = mockSales.filter { calendar.isDate($0.saleDate, inSameDayAs: yesterdayDay) }.reduce(0) { $0 + $1.totalAmount }
         let yesterdayChange = yesterdayTotal > 0 ? ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100.0 : 0
         
         let lastWeekBaseline = totalAchieved / 1.12 // Mock comparison as we only fetched this week
@@ -423,21 +324,28 @@ class SalesPerformanceViewModel: ObservableObject {
         let lastMonthBaseline = totalAchieved / 0.98
         let lastMonthChange = lastMonthBaseline > 0 ? ((totalAchieved - lastMonthBaseline) / lastMonthBaseline) * 100.0 : 0
         
+        let isYesterdayAvailable = yesterdayTotal > 0 || todayTotal > 0
+        let isLastWeekAvailable = totalAchieved > 0
+        let isLastMonthAvailable = totalAchieved > 0
+        
         self.comparisons = [
             PerformanceComparison(
                 period: "vs Yesterday",
                 percentageChange: yesterdayChange,
-                percentageString: String(format: "%+d%%", Int(round(yesterdayChange)))
+                percentageString: isYesterdayAvailable ? String(format: "%+d%%", Int(round(yesterdayChange))) : "Data Not Available",
+                isDataAvailable: isYesterdayAvailable
             ),
             PerformanceComparison(
                 period: "vs Last Week",
                 percentageChange: lastWeekChange,
-                percentageString: String(format: "%+d%%", Int(round(lastWeekChange)))
+                percentageString: isLastWeekAvailable ? String(format: "%+d%%", Int(round(lastWeekChange))) : "Data Not Available",
+                isDataAvailable: isLastWeekAvailable
             ),
             PerformanceComparison(
                 period: "vs Last Month",
                 percentageChange: lastMonthChange,
-                percentageString: String(format: "%+d%%", Int(round(lastMonthChange)))
+                percentageString: isLastMonthAvailable ? String(format: "%+d%%", Int(round(lastMonthChange))) : "Data Not Available",
+                isDataAvailable: isLastMonthAvailable
             )
         ]
         
@@ -463,10 +371,12 @@ class SalesPerformanceViewModel: ObservableObject {
                 
                 let iconName: String
                 switch product.category {
-                case .bag: iconName = "handbag.fill"
-                case .perfume: iconName = "drop.fill"
-                case .wallet: iconName = "creditcard.fill"
-                case .ring: iconName = "sparkles"
+                case .handbags: iconName = "handbag.fill"
+                case .fragrances: iconName = "drop.fill"
+                case .accessories: iconName = "creditcard.fill"
+                case .jewellery: iconName = "sparkles"
+                case .watches: iconName = "applewatch"
+                case .footware: iconName = "shoe.fill"
                 default: iconName = "cube.box.fill"
                 }
                 
@@ -479,5 +389,84 @@ class SalesPerformanceViewModel: ObservableObject {
             }
         }
         self.bestSellers = computedBestSellers
+        
+
+        // Calculate Peak Hours (Morning, Afternoon, Evening)
+        var todayMorning: Double = 0, todayAfternoon: Double = 0, todayEvening: Double = 0
+        var yesterdayMorning: Double = 0, yesterdayAfternoon: Double = 0, yesterdayEvening: Double = 0
+        var weekMorning: Double = 0, weekAfternoon: Double = 0, weekEvening: Double = 0
+        
+        let today = Date()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
+        
+        for sale in mockSales {
+            let hour = Calendar.current.component(.hour, from: sale.saleDate)
+            
+            let isToday = Calendar.current.isDate(sale.saleDate, inSameDayAs: today)
+            let isYesterday = Calendar.current.isDate(sale.saleDate, inSameDayAs: yesterday)
+            
+            if hour >= 6 && hour < 12 {
+                weekMorning += sale.totalAmount
+                if isToday { todayMorning += sale.totalAmount }
+                if isYesterday { yesterdayMorning += sale.totalAmount }
+            } else if hour >= 12 && hour < 17 {
+                weekAfternoon += sale.totalAmount
+                if isToday { todayAfternoon += sale.totalAmount }
+                if isYesterday { yesterdayAfternoon += sale.totalAmount }
+            } else {
+                weekEvening += sale.totalAmount
+                if isToday { todayEvening += sale.totalAmount }
+                if isYesterday { yesterdayEvening += sale.totalAmount }
+            }
+        }
+        
+        self.peakHoursToday = [
+            PeakHourData(period: "Morning", revenue: todayMorning, color: .gray),
+            PeakHourData(period: "Afternoon", revenue: todayAfternoon, color: .gray),
+            PeakHourData(period: "Evening", revenue: todayEvening, color: .gray)
+        ]
+        
+        self.peakHoursYesterday = [
+            PeakHourData(period: "Morning", revenue: yesterdayMorning, color: .gray),
+            PeakHourData(period: "Afternoon", revenue: yesterdayAfternoon, color: .gray),
+            PeakHourData(period: "Evening", revenue: yesterdayEvening, color: .gray)
+        ]
+        
+        self.peakHoursThisWeek = [
+            PeakHourData(period: "Morning", revenue: weekMorning, color: .gray),
+            PeakHourData(period: "Afternoon", revenue: weekAfternoon, color: .gray),
+            PeakHourData(period: "Evening", revenue: weekEvening, color: .gray)
+        ]
+        
+        // Populate Detailed Sales List
+        var computedSalesList: [DetailedSaleItem] = []
+        for item in mockSalesItems {
+            if let sale = mockSales.first(where: { $0.id == item.saleID }),
+               let product = mockProducts.first(where: { $0.id == item.productID }) {
+                
+                let iconName: String
+                switch product.category {
+                case .handbags: iconName = "handbag.fill"
+                case .fragrances: iconName = "drop.fill"
+                case .accessories: iconName = "creditcard.fill"
+                case .jewellery: iconName = "sparkles"
+                case .watches: iconName = "applewatch"
+                case .footware: iconName = "shoe.fill"
+                default: iconName = "cube.box.fill"
+                }
+                
+                computedSalesList.append(DetailedSaleItem(
+                    productName: product.name,
+                    category: product.category,
+                    date: sale.saleDate,
+                    units: item.quantity,
+                    amount: item.subTotal,
+                    iconName: iconName
+                ))
+            }
+        }
+        
+        // Sort descending by default
+        self.detailedSalesList = computedSalesList.sorted { $0.date > $1.date }
     }
 }

@@ -4,80 +4,102 @@
 //
 //  Created by Akhand Pratap Singh on 25/06/26.
 //
-
 import SwiftUI
-
 struct TopPerformerCard: View {
     let topPerformerName: String?
     let topPerformerSales: Double
     let progress: CGFloat
+    private var currentMonthName: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        return formatter.string(from: Date())
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-
-            // Header
-            HStack(spacing: 4) {
-                Image(systemName: "trophy")
-                    .font(.system(size: 11))
-                    .foregroundColor(.gray)
-                Text("Top Performer")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 12) {
+            // Section label
+            HStack(spacing: 6) {
+                Text("Top Performer of \(currentMonthName)")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                Spacer()
             }
-
-            // Profile row — gauge replaces the $12.5k block
-            Group {
-                HStack(spacing: 6) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .resizable()
-                        .frame(width: 26, height: 26)
-                        .foregroundColor(.gray.opacity(0.5))
-
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(topPerformerName ?? "N/A")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.themeText)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.85)
+            
+            if let name = topPerformerName {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        // Avatar
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .frame(width: 36, height: 36)
+                            .foregroundStyle(.quaternary)
+                        
+                        Spacer()
+                        
+                        // Sales Amount
+                        Text(formatSales(topPerformerSales))
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.themeAccent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.themeAccent.opacity(0.1))
+                            .clipShape(Capsule())
                     }
-
-                    Spacer(minLength: 2)
-
-                    // Gauge in place of the sales figure
-                    SemiCircularGauge(progress: progress, size: 64)
-                        .padding(.trailing, -10)
+                    
+                    // Name & Label
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(name)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        
+                        Text("Outstanding Service")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
-            }.padding(.top, 4)
-
-            Spacer(minLength: 0)
-
-            // Sales figure + insight merged into one block
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(format: "$%.1fk", topPerformerSales / 1000.0))
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.themeText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-
-                Text("Outstanding client service driving high-end results.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.gray)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(3)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No data yet")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    Text("No performer for this period")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .padding(.top, 8)
             }
         }
+        .frame(maxWidth: .infinity, minHeight: 180, maxHeight: .infinity, alignment: .topLeading)
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 170, maxHeight: .infinity, alignment: .top)
         .background(Color.themeCard)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.04), radius: 12, x: 0, y: 6)
+    }
+    
+    private func formatSales(_ amount: Double) -> String {
+        if amount >= 100000 {
+            return String(format: "$%.1fk", amount / 1000.0)
+        } else if amount >= 1000 {
+            return String(format: "$%.1fk", amount / 1000.0)
+        } else {
+            return String(format: "$%.0f", amount)
+        }
     }
 }
-
 #Preview {
-    TopPerformerCard(topPerformerName: "Mock Name", topPerformerSales: 50000, progress: 0.8)
-        .preferredColorScheme(.light)
+    TopPerformerCard(topPerformerName: "Gorish Verma", topPerformerSales: 6688000, progress: 0.8)
+        .padding()
+        .background(Color.themeBackground)
 }

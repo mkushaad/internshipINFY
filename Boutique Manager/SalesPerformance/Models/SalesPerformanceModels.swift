@@ -23,6 +23,7 @@ struct DailySalesTrend: Identifiable {
     let day: String
     let target: Double
     let actual: Double
+    var isFuture: Bool = false
 }
 
 enum DailyStatus: String, CaseIterable {
@@ -62,6 +63,46 @@ struct StoreKPI: Identifiable {
     let iconName: String
 }
 
+struct CategorySalesShare: Identifiable {
+    let id = UUID()
+    let category: ProductCategory
+    let percentage: Double
+    let color: Color
+}
+
+struct BestSellingProduct: Identifiable {
+    let id = UUID()
+    let name: String
+    let imageName: String
+    let unitsSold: String
+    let revenue: String
+}
+
+struct DetailedSaleItem: Identifiable, Equatable {
+    let id = UUID()
+    let productName: String
+    let category: ProductCategory
+    let date: Date
+    let units: Int
+    let amount: Double
+    let iconName: String
+}
+
+struct PerformanceComparison: Identifiable {
+    let id = UUID()
+    let period: String
+    let percentageChange: Double
+    let percentageString: String
+    var isDataAvailable: Bool = true
+}
+
+struct PeakHourData: Identifiable {
+    let id = UUID()
+    let period: String // e.g., "Morning", "Afternoon", "Evening"
+    let revenue: Double
+    let color: Color
+}
+
 struct SalesAssociatePerformance: Identifiable {
     let id = UUID()
     let name: String
@@ -76,21 +117,6 @@ struct AssociateNeedingAttention: Identifiable {
     let imageName: String
     let achievementPercentage: Double
     let reason: String
-}
-
-struct CategorySalesShare: Identifiable {
-    let id = UUID()
-    let category: ProductCategory
-    let percentage: Double
-    let color: Color
-}
-
-struct BestSellingProduct: Identifiable {
-    let id = UUID()
-    let name: String
-    let imageName: String
-    let unitsSold: String
-    let revenue: String
 }
 
 struct MissedOpportunity: Identifiable {
@@ -108,31 +134,8 @@ struct AIRecommendation: Identifiable {
     let iconName: String
 }
 
-struct PerformanceComparison: Identifiable {
-    let id = UUID()
-    let period: String
-    let percentageChange: Double
-    let percentageString: String
-}
-
 struct PendingActionItem: Identifiable {
     let id = UUID()
     let title: String
     let iconName: String
-}
-
-struct DetailedSaleItem: Identifiable, Equatable {
-    let id = UUID()
-    let productName: String
-    let category: ProductCategory
-    let date: Date
-    let units: Int
-    let amount: Double
-    let iconName: String
-}
-
-struct PeakHourData: Identifiable {
-    let id = UUID()
-    let period: String
-    let revenue: Double
 }

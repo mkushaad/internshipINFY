@@ -16,6 +16,7 @@ class AssociateAppointmentsViewModel {
                 .from("Appointment")
                 .select("*, client_profiles(*)")
                 .eq("salesAssociateID", value: associateID.uuidString)
+                .eq("status", value: AppointmentStatus.scheduled.rawValue)
                 .execute()
                 .value
                 

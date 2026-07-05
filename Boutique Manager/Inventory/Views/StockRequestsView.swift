@@ -453,6 +453,7 @@ struct StoreTransferRowCard: View {
         case .accepted: return .green
         case .declined: return .red
         case .cancelled: return .gray
+        default: return .blue
         }
     }
     

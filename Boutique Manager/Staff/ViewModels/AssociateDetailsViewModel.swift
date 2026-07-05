@@ -11,15 +11,20 @@ class AssociateDetailsViewModel {
     
     var monthlyTarget: AssociateSalesTarget?
     var monthlySalesTotal: Double = 0.0
-    var recentMonthlySales: [Sale] = []
+    var storeMonthlySalesTotal: Double = 0.0
+    var recentMonthlySales: [SaleDisplayData] = []
     var dailySalesDisplayData: [SaleDisplayData] = []
+    
+    var monthlyAppointmentsCount: Int = 0
+    var monthlySalesCount: Int = 0
+    var appointmentAttendanceRate: Double = 0
+    var highValueClientAppointments: Int = 0
     
     var isLoading = false
     var storeCurrency: Currency = .usd
     
     var intelligenceSummary: String = ""
     var isGeneratingSummary = false
-    var monthlyAppointmentsCount: Int = 0
     
     func fetchData(userID: UUID, storeID: UUID, date: Date) async {
         isLoading = true
@@ -64,7 +69,7 @@ class AssociateDetailsViewModel {
                 self.shift = fetchedShifts.first
                 self.leave = fetchedLeaves.first
                 self.tasks = fetchedTasks.sorted { $0.isCompleted && !$1.isCompleted }
-                self.storeCurrency = fetchedStore.currency
+                self.storeCurrency = fetchedStore.currency ?? .usd
                 self.isLoading = false
             }
             
@@ -320,19 +325,22 @@ class AssociateDetailsViewModel {
     func fetchSales(userID: UUID, storeID: UUID, date: Date) async {
         let calendar = Calendar.current
         
-        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: date)),
-              let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) else { return }
+        let monthComponents = calendar.dateComponents([.year, .month], from: date)
+        let monthStart = calendar.date(from: monthComponents) ?? date
+        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? date
         
         let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+        isoFormatter.formatOptions = [.withFullDate]
+        let startString = isoFormatter.string(from: monthStart)
+        let endString = isoFormatter.string(from: monthEnd)
         
         do {
             let fetchedTargets: [AssociateSalesTarget] = try await SupabaseService.shared.client
                 .from("AssociateSalesTarget")
                 .select()
                 .eq("assignedToID", value: userID.uuidString)
-                .gte("periodStartDate", value: isoFormatter.string(from: monthStart))
-                .lte("periodStartDate", value: isoFormatter.string(from: monthEnd))
+                .gte("periodStartDate", value: startString)
+                .lt("periodStartDate", value: endString)
                 .execute()
                 .value
                 
@@ -343,21 +351,49 @@ class AssociateDetailsViewModel {
         }
         
         do {
+            // Fetch all sales for store in month to perfectly match HomeView's working logic
             let fetchedSales: [Sale] = try await SupabaseService.shared.client
                 .from("Sales")
                 .select()
-                .eq("salesAssociateID", value: userID.uuidString)
-                .gte("salesDate", value: isoFormatter.string(from: monthStart))
-                .lte("salesDate", value: isoFormatter.string(from: calendar.date(byAdding: .day, value: 1, to: monthEnd)!))
+                .eq("storeID", value: storeID.uuidString)
+                .gte("salesDate", value: startString)
+                .lt("salesDate", value: endString)
                 .execute()
                 .value
                 
-            let total = fetchedSales.reduce(0) { $0 + $1.totalAmount }
-            let sortedSales = fetchedSales.sorted { $0.saleDate > $1.saleDate }
+            let storeTotal = fetchedSales.reduce(0) { $0 + $1.totalAmount }
+            let userSales = fetchedSales.filter { $0.salesAssociateID == userID }
+            let total = userSales.reduce(0) { $0 + $1.totalAmount }
+            let sortedSales = userSales.sorted { $0.saleDate > $1.saleDate }
             let recent = Array(sortedSales.prefix(3))
-            await MainActor.run { 
-                self.monthlySalesTotal = total 
-                self.recentMonthlySales = recent
+            
+            var displayData: [SaleDisplayData] = []
+            for sale in recent {
+                let items: [SalesItem] = try await SupabaseService.shared.client
+                    .from("SalesItem")
+                    .select()
+                    .eq("saleID", value: sale.id.uuidString)
+                    .execute()
+                    .value
+                    
+                let productIDs = items.map { $0.productID.uuidString }
+                var products: [Product] = []
+                if !productIDs.isEmpty {
+                    products = try await SupabaseService.shared.client
+                        .from("Product")
+                        .select()
+                        .in("id", values: productIDs)
+                        .execute()
+                        .value
+                }
+                displayData.append(SaleDisplayData(sale: sale, items: items, products: products))
+            }
+            
+            await MainActor.run {
+                self.monthlySalesTotal = total
+                self.monthlySalesCount = userSales.count
+                self.storeMonthlySalesTotal = storeTotal
+                self.recentMonthlySales = displayData
             }
         } catch {
             print("Error fetching monthly sales: \(error)")
@@ -366,14 +402,29 @@ class AssociateDetailsViewModel {
         do {
             let fetchedAppts: [Appointment] = try await SupabaseService.shared.client
                 .from("Appointment")
-                .select()
+                .select("*, client_profiles(*)")
                 .eq("salesAssociateID", value: userID.uuidString)
-                .eq("status", value: AppointmentStatus.completed.rawValue)
-                .gte("date", value: isoFormatter.string(from: monthStart))
-                .lte("date", value: isoFormatter.string(from: monthEnd))
+                .gte("date", value: startString)
+                .lt("date", value: endString)
                 .execute()
                 .value
-            await MainActor.run { self.monthlyAppointmentsCount = fetchedAppts.count }
+                
+            let completed = fetchedAppts.filter { $0.status == .completed }.count
+            let totalSched = fetchedAppts.count
+            let attendance = totalSched > 0 ? (Double(completed) / Double(totalSched)) * 100 : 0
+            
+            let highTier = fetchedAppts.filter { appt in
+                if let tier = appt.client_profiles?.tier {
+                    return tier.localizedCaseInsensitiveContains("VIP") || tier.localizedCaseInsensitiveContains("Platinum") || tier.localizedCaseInsensitiveContains("Gold")
+                }
+                return false
+            }.count
+            
+            await MainActor.run { 
+                self.monthlyAppointmentsCount = completed 
+                self.appointmentAttendanceRate = attendance
+                self.highValueClientAppointments = highTier
+            }
         } catch {
             print("Error fetching appointments: \(error)")
         }
@@ -437,31 +488,53 @@ class AssociateDetailsViewModel {
         
         if session == nil {
             let instructions = """
-            ROLE: You are an expert retail performance analyst reporting to a Store Manager.
+            ROLE: You are an elite retail performance analyst advising a Store Manager on team talent optimization and performance incentive allocation.
+            
             RULES:
-            - Provide a brief analysis (MAXIMUM 2-3 short sentences).
-            - Blend the provided stats (sales, target %, appointments) naturally into your insights to back up your analysis.
-            - Keep the tone highly professional, objective, and constructively supportive (NEVER be harsh or overly critical, even if targets are missed).
-            - Speak directly to the manager (e.g., "Gorish's 56% target completion and 3 appointments show...").
+            - YOU are speaking TO the Store Manager. 
+            - The data provided belongs to a SALES ASSOCIATE (named e.g. "Shubhrat"). The associate is the employee being evaluated by the manager.
+            - Refer to the associate in the third person using their name. NEVER address the associate directly as "you". NEVER call the associate a manager.
+            - CRITICAL LENGTH LIMIT: Limit response to a MAXIMUM of 40 words. Be extremely crisp, punchy, and direct. Do not write a long paragraph. 2-3 sentences max.
+            - TONE: Adopt a constructive, professional, and empathetic tone typical of high-end luxury retail managers. Frame underperformance as an opportunity for coaching rather than a failure.
+            - Focus on the overarching narrative: Are they relying on low-volume high-margin sales? Are they struggling with operational discipline despite good sales? How do they compare to the store's overall performance?
+            - CRITICAL: You must accurately state whether they met, exceeded, or fell short of their sales target based on the context provided. Avoid harsh words like "FAILED"; instead, use "fell short" or "did not meet".
+            - DO NOT simply output a robotic list of all raw stats. However, when you discuss a derived metric, you MUST include the exact number provided in the context to ground your assessment.
+            - Conclude with a clear recommendation on whether they deserve recognition, mentorship, or urgent intervention.
             """
             session = LanguageModelSession(instructions: instructions)
         }
         
         guard let currentSession = session else { return }
+        
+        let totalTasks = tasks.count
+        let completedTasks = tasks.filter { $0.isCompleted }.count
+        let taskCompletionRate = totalTasks > 0 ? (Double(completedTasks) / Double(totalTasks)) * 100 : 0
+        let topRecentSale = recentMonthlySales.max(by: { $0.totalAmount < $1.totalAmount })
+        let topSaleText = topRecentSale != nil ? "Their highest recent transaction was $\(String(format: "%.0f", topRecentSale!.totalAmount))." : ""
+        let atv = monthlySalesCount > 0 ? achievedAmount / Double(monthlySalesCount) : 0
+        
         let difference = achievedAmount - targetAmount
         
         let performanceStatus: String
         if targetAmount == 0 {
-            performanceStatus = "They have $\(String(format: "%.0f", achievedAmount)) in sales with no set target."
+            performanceStatus = "generated $\(String(format: "%.0f", achievedAmount)) in sales without a formal baseline target set."
         } else if difference > 0 {
-            performanceStatus = "They exceeded their $\(String(format: "%.0f", targetAmount)) target by $\(String(format: "%.0f", difference)) (achieving \(String(format: "%.0f", targetPercentage))%)."
+            performanceStatus = "crushed expectations by surpassing their $\(String(format: "%.0f", targetAmount)) target by $\(String(format: "%.0f", difference)), unlocking an impressive \(String(format: "%.0f", targetPercentage))% target completion."
         } else if difference < 0 {
-            performanceStatus = "They are $\(String(format: "%.0f", abs(difference))) short of their $\(String(format: "%.0f", targetAmount)) target (achieving \(String(format: "%.0f", targetPercentage))%)."
+            performanceStatus = "fell short of their sales target. They finished $\(String(format: "%.0f", abs(difference))) shy of their $\(String(format: "%.0f", targetAmount)) target, meeting only \(String(format: "%.0f", targetPercentage))% of the objective."
         } else {
-            performanceStatus = "They exactly met their $\(String(format: "%.0f", targetAmount)) target."
+            performanceStatus = "hit their target exactly, converting a perfect $\(String(format: "%.0f", targetAmount)) value."
         }
         
-        let prompt = "Analyze the performance for associate: \(associateName). \(performanceStatus) Total sales: $\(String(format: "%.0f", achievedAmount)). Successfully completed appointments: \(appts). DO NOT do any math, just use these facts."
+        let prompt = """
+        Provide an extremely concise, qualitative managerial assessment for \(associateName) (MAXIMUM 40 WORDS) based on this hidden data context: 
+        Sales Context: They \(performanceStatus) (Total Revenue: $\(String(format: "%.0f", achievedAmount)), Average Transaction Value: $\(String(format: "%.0f", atv))). 
+        Store Context: The entire store generated $\(String(format: "%.0f", storeMonthlySalesTotal)) this month. This associate contributed \((storeMonthlySalesTotal > 0 ? (achievedAmount / storeMonthlySalesTotal) * 100 : 0).formatted(.number.precision(.fractionLength(0))))% of the store's total revenue.
+        Client Interaction: \(appts) completed appointments (\(String(format: "%.0f", appointmentAttendanceRate))% attendance rate), with \(highValueClientAppointments) being VIP/high-tier clients.
+        Operational Efficiency: \(String(format: "%.0f", taskCompletionRate))% task completion rate. \(topSaleText)
+        
+        Synthesize this into a meaningful, human-like insight. Remember: DO NOT recite the numbers. Tell the manager what the numbers *mean*. BE EXTREMELY SHORT.
+        """
         
         do {
             let response = try await currentSession.respond(to: prompt)
@@ -487,18 +560,18 @@ class AssociateDetailsViewModel {
 
     func saveMonthlyTarget(amount: Double, userID: UUID, storeID: UUID, date: Date) async {
         let calendar = Calendar.current
-        let currentDate = Date()
-        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: currentDate)),
-              let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) else { return }
-              
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let monthComponents = calendar.dateComponents([.year, .month], from: date)
+        let monthStart = calendar.date(from: monthComponents) ?? date
+        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? date
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
         
         let target = AssociateSalesTarget(
             id: monthlyTarget?.id ?? UUID(),
             storeID: storeID,
             assignedToID: userID,
-            periodStartDate: formatter.string(from: currentDate),
+            periodStartDate: formatter.string(from: monthStart),
             periodEndDate: formatter.string(from: monthEnd),
             targetAmount: amount
         )
@@ -514,3 +587,4 @@ class AssociateDetailsViewModel {
         }
     }
 }
+

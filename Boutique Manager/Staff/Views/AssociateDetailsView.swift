@@ -37,17 +37,16 @@ struct AssociateDetailsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 headerCard
-
+                
                 monthlyGoalsSection
                 checklistSection
                 appointmentsSection
-
                 monthlySalesSection
-
-                salesHistorySection
             }
             .padding()
+            .padding(.bottom, 120)
         }
+        .redacted(reason: detailsVM.isLoading ? .placeholder : [])
         .scrollDismissesKeyboard(.immediately)
         .background(Color.themeBackground.ignoresSafeArea())
         .navigationTitle("Associate Details")
@@ -119,78 +118,94 @@ struct AssociateDetailsView: View {
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 16) {
-            // Avatar
-            ZStack {
-                Circle()
-                    .fill(Color.themeAccent.opacity(0.15))
-                    .frame(width: 72, height: 72)
+                // Avatar
+                ZStack {
+                    Circle()
+                        .fill(Color.themeAccent.opacity(0.15))
+                        .frame(width: 64, height: 64)
+                    
+                    Text(String(user.firstName.prefix(1) + user.lastName.prefix(1)))
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.themeAccent)
+                }
+                .overlay(
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 14, height: 14)
+                        .overlay(Circle().stroke(Color.themeCard, lineWidth: 2))
+                        .offset(x: 22, y: 22)
+                )
                 
-                Text(String(user.firstName.prefix(1) + user.lastName.prefix(1)))
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundColor(.themeAccent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(user.firstName) \(user.lastName)")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    Text("Sales Associate")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
             }
             
-            VStack(alignment: .leading, spacing: 6) {
-                Text("\(user.firstName) \(user.lastName)")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.primary)
-                
-                Text("Sales Associate")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.secondary)
-                
+            Divider()
+            
+            HStack(spacing: 12) {
                 Menu {
                     Button("Morning (9:00 AM - 2:00 PM)") { initiateShiftChange(type: .morning) }
                     Button("Evening (2:00 PM - 7:00 PM)") { initiateShiftChange(type: .evening) }
                     Button(role: .destructive, action: { showingLeaveRequestSheet = true }) {
                         Label("On Leave", systemImage: "xmark.circle")
                     }
-                    } label: {
+                } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
-                            .font(.system(size: 13))
+                            .font(.system(size: 14))
                         Text(detailsVM.leave != nil ? "On Leave" : (detailsVM.shift?.shiftType.displayName ?? "Assign Shift"))
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(detailsVM.leave != nil ? Color.red.opacity(0.1) : Color.themeAccent.opacity(0.1))
-                    .foregroundColor(detailsVM.leave != nil ? .red : .themeAccent)
-                    .cornerRadius(6)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(detailsVM.leave != nil ? Color.red.opacity(0.1) : Color.white)
+                    .foregroundColor(detailsVM.leave != nil ? .red : .primary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
                 }
-            }
-            
-            Spacer()
-            }
-            
-            if !showIntelligenceSummary {
+                
                 Button(action: {
                     withAnimation(.spring()) {
-                        showIntelligenceSummary = true
+                        showIntelligenceSummary.toggle()
                     }
-                    Task {
-                        await detailsVM.generateIntelligenceSummary(associateName: user.firstName)
+                    if showIntelligenceSummary {
+                        Task {
+                            await detailsVM.generateIntelligenceSummary(associateName: user.firstName)
+                        }
                     }
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
-                        Text("Summarize Performance")
+                        Text("Summarize")
                     }
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.themeAccent)
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.themeAccent.opacity(0.1))
+                    .cornerRadius(8)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
-                .padding(.top, 4)
-            } else {
+            }
+            
+            if showIntelligenceSummary {
                 Divider()
                 intelligenceSummaryCard
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 20)
+        .padding(20)
         .background(Color.themeCard)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
@@ -268,7 +283,7 @@ struct AssociateDetailsView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text(String(format: "%@%.2f achieved", detailsVM.storeCurrency.symbol, achieved))
+                            Text("\(detailsVM.storeCurrency.symbol)\(achieved.formatted(.number.precision(.fractionLength(0)))) achieved")
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.primary)
                             Spacer()
@@ -305,6 +320,18 @@ struct AssociateDetailsView: View {
                 if detailsVM.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, alignment: .center)
+                } else if detailsVM.tasks.isEmpty && !isAddingChecklistItem {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 32))
+                            .foregroundColor(.gray.opacity(0.5))
+                        
+                        Text("No tasks assigned")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                 } else {
                     ForEach(detailsVM.tasks) { task in
                         SwipeableChecklistItem(
@@ -343,59 +370,55 @@ struct AssociateDetailsView: View {
             .padding(.top, 16)
         }
     }
-    
     private var monthlySalesSection: some View {
-        SectionCard(title: "Monthly Sales - \(monthString)", showPlus: false) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Total Sales")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.secondary)
-                        Text(detailsVM.storeCurrency.symbol + String(format: "%.2f", detailsVM.monthlySalesTotal))
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.primary)
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                    }
-                    
-                    Spacer()
-                    
-                    if let storeID = AuthManager.shared.currentUser?.assignedStoreID {
-                        NavigationLink(destination: AssociateSalesHistoryView(user: user, storeID: storeID)) {
-                            Text("View All")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.themeAccent)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color.themeAccent.opacity(0.1))
-                                .cornerRadius(8)
-                        }
+        let seeAllLink = AnyView(
+            Group {
+                if let storeID = AuthManager.shared.currentUser?.assignedStoreID {
+                    NavigationLink(destination: AssociateSalesHistoryView(user: user, storeID: storeID)) {
+                        Text("See All")
+                            .font(.system(size: 16))
+                            .foregroundColor(.themeAccent)
                     }
                 }
-                
-                if !detailsVM.recentMonthlySales.isEmpty {
-                    Divider()
-                        .padding(.vertical, 4)
-                    
+            }
+        )
+        
+        return SectionCard(title: "Monthly Sales - \(monthString)", showPlus: false, trailingView: seeAllLink) {
+            VStack(alignment: .leading, spacing: 16) {
+                if detailsVM.recentMonthlySales.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "cart.badge.questionmark")
+                            .font(.system(size: 32))
+                            .foregroundColor(.gray.opacity(0.5))
+                        
+                        Text("No recent sales")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                } else {
                     VStack(spacing: 12) {
                         ForEach(detailsVM.recentMonthlySales) { sale in
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Order #\(sale.id.uuidString.prefix(6))")
+                                    let productName = sale.products.first?.name ?? "Product"
+                                    Text(productName)
                                         .font(.system(size: 15, weight: .medium))
+                                        .lineLimit(1)
                                     Text(sale.saleDate.formatted(date: .abbreviated, time: .shortened))
                                         .font(.system(size: 13))
                                         .foregroundColor(.secondary)
                                 }
                                 Spacer()
-                                Text(detailsVM.storeCurrency.symbol + String(format: "%.2f", sale.totalAmount))
+                                Text("\(detailsVM.storeCurrency.symbol)\(sale.totalAmount.formatted(.number.precision(.fractionLength(0))))")
                                     .font(.system(size: 15, weight: .semibold))
                             }
                         }
                     }
                 }
             }
+            .padding(.top, 16)
         }
     }
     
@@ -447,37 +470,7 @@ struct AssociateDetailsView: View {
     }
     
     @ViewBuilder
-    private var salesHistorySection: some View {
-        if !detailsVM.dailySalesDisplayData.isEmpty {
-            SectionCard(title: "Sales History", showPlus: false) {
-                VStack(spacing: 16) {
-                    ForEach(detailsVM.dailySalesDisplayData) { displayData in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(displayData.saleDate.formatted(date: .omitted, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text(String(format: "$%.2f", displayData.totalAmount))
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(.themeAccent)
-                            }
-                            
-                            Divider()
-                            
-                            ForEach(displayData.items) { item in
-                                SaleItemRowView(item: item, products: displayData.products)
-                            }
-                        }
-                        .padding()
-                        .background(Color.secondary.opacity(0.05))
-                        .cornerRadius(12)
-                    }
-                }
-                .padding(.top, 16)
-            }
-        }
-    }
+
     
     private func initiateShiftChange(type: ShiftType) {
         guard !isCheckingShift else { return }
@@ -507,12 +500,14 @@ struct SectionCard<Content: View>: View {
     let title: String
     let showPlus: Bool
     let onAdd: (() -> Void)?
+    let trailingView: AnyView?
     let content: Content
     
-    init(title: String, showPlus: Bool = true, onAdd: (() -> Void)? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String, showPlus: Bool = true, onAdd: (() -> Void)? = nil, trailingView: AnyView? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.showPlus = showPlus
         self.onAdd = onAdd
+        self.trailingView = trailingView
         self.content = content()
     }
     
@@ -523,6 +518,10 @@ struct SectionCard<Content: View>: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.primary)
                 Spacer()
+                
+                if let trailingView = trailingView {
+                    trailingView
+                }
                 
                 if showPlus {
                     if let onAdd = onAdd {
@@ -662,6 +661,8 @@ struct AppointmentRow: View {
                         Text("Prefers: \(prefs)")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                     Text(appointment.date.formatted(date: .abbreviated, time: .shortened))
                         .font(.subheadline)

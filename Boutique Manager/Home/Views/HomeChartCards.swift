@@ -32,19 +32,22 @@ struct DailySalesChartCard: View {
             // Chart
             Chart {
                 ForEach(activeTrends) { item in
+                    if !item.isFuture {
                         LineMark(
                             x: .value("Day", item.day),
                             y: .value("Sales", item.actual)
                         )
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.themeAccent)
                         .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                         
                         PointMark(
                             x: .value("Day", item.day),
                             y: .value("Sales", item.actual)
                         )
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.themeAccent)
                         .symbolSize(40)
+                    }
+                    
                     // Invisible mark to guarantee the X-axis domain is preserved
                     BarMark(
                         x: .value("Day", item.day),
@@ -95,7 +98,7 @@ struct DailySalesChartCard: View {
     }
 }
 struct SalesByCategoryCard: View {
-    let categorySales: [CategorySalesShare]
+    let categorySales: [HomeCategorySaleData]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -113,7 +116,7 @@ struct SalesByCategoryCard: View {
                 VStack(spacing: 8) {
                     Image(systemName: "chart.pie")
                         .font(.largeTitle)
-                        .foregroundStyle(Color.gray.opacity(0.3))
+                        .foregroundStyle(Color.themeSubtle)
                     Text("No category data yet")
                         .font(.caption)
                         .foregroundStyle(.secondary)

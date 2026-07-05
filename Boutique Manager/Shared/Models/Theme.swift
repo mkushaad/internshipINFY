@@ -6,6 +6,8 @@ extension Color {
     static let themeAccent = Color(hex: "B08A45")
     static let themeText = Color(hex: "2D2A26")
     static let themeCard = Color.white
+    static let themeSubtle = Color.gray.opacity(0.3)
+    static let themeSuccess = Color.green
 
     // Hex Helper
     init(hex: String) {

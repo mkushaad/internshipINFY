@@ -347,8 +347,12 @@ struct InventoryRequestRowCard: View {
                 return ("Pending", .orange, Color.orange.opacity(0.12))
             case .fulfilled:
                 return ("Fulfilled", .green, Color.green.opacity(0.12))
+            case .approved:
+                return ("Approved", .blue, Color.blue.opacity(0.12))
             case .rejected:
                 return ("Rejected", .red, Color.red.opacity(0.12))
+            case .cancelled:
+                return ("Cancelled", .gray, Color.gray.opacity(0.12))
             }
         }()
         

@@ -59,16 +59,16 @@ struct InventoryMetrics: Codable {
 
 struct StoreSalesTarget: Codable, Identifiable {
     let id: UUID
-    let storeID: UUID
+    let storeID: UUID?
     let targetAmount: Double
-    let currency: Currency
-    let period: SalesTargetPeriod
-    let startDate: Date
-    let endDate: Date
-    let assignedDate: Date
+    let currency: Currency?
+    let period: SalesTargetPeriod?
+    let startDate: String?
+    let endDate: String?
+    let assignedDate: String?
     let assignedBy: UUID?
-    let isActive: Bool
+    let isActive: Bool?
     
-    let createDate: Date?
-    let updateDate: Date?
+    let createDate: String?
+    let updateDate: String?
 }

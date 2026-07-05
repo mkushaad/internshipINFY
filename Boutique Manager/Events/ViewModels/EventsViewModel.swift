@@ -155,7 +155,7 @@ class EventsViewModel {
                     EventInvitation(
                         id: UUID(),
                         eventID: newEvent.id,
-                        customerID: UUID(uuidString: client.id) ?? UUID(),
+                        customerID: client.id,
                         rsvpStatus: .pending
                     )
                 }

@@ -4,12 +4,12 @@ import Supabase
 
 @Observable
 class AssociateSalesHistoryViewModel {
-    var lastMonthSales: [Sale] = []
-    var thisYearSales: [Sale] = []
+    var thisMonthSales: [SaleDisplayData] = []
+    var thisYearSales: [SaleDisplayData] = []
     var isLoading = false
     
-    var lastMonthTotal: Double {
-        lastMonthSales.reduce(0) { $0 + $1.totalAmount }
+    var thisMonthTotal: Double {
+        thisMonthSales.reduce(0) { $0 + $1.totalAmount }
     }
     
     var thisYearTotal: Double {
@@ -33,14 +33,12 @@ class AssociateSalesHistoryViewModel {
         yearComponents.second = 0
         guard let startOfYear = calendar.date(from: yearComponents) else { return }
         
-        // Last Month calculation
+        // This Month calculation
         var monthComponents = calendar.dateComponents([.year, .month], from: now)
-        monthComponents.month! -= 1
-        guard let startOfLastMonth = calendar.date(from: monthComponents),
-              let endOfLastMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1, hour: 23, minute: 59, second: 59), to: startOfLastMonth) else { return }
+        guard let startOfThisMonth = calendar.date(from: monthComponents) else { return }
         
         do {
-            let earliestDate = startOfYear < startOfLastMonth ? startOfYear : startOfLastMonth
+            let earliestDate = startOfYear < startOfThisMonth ? startOfYear : startOfThisMonth
             
             let allRelevantSales: [Sale] = try await SupabaseService.shared.client
                 .from("Sales")
@@ -51,16 +49,46 @@ class AssociateSalesHistoryViewModel {
                 .execute()
                 .value
                 
-            let lastMonthList = allRelevantSales.filter { sale in
-                sale.saleDate >= startOfLastMonth && sale.saleDate <= endOfLastMonth
+            var displayDataList: [SaleDisplayData] = []
+            
+            let saleIDs = allRelevantSales.map { $0.id.uuidString }
+            if !saleIDs.isEmpty {
+                let fetchedItems: [SalesItem] = try await SupabaseService.shared.client
+                    .from("SalesItem")
+                    .select()
+                    .in("saleID", values: saleIDs)
+                    .execute()
+                    .value
+                
+                let productIDs = Array(Set(fetchedItems.map { $0.productID.uuidString }))
+                var fetchedProducts: [Product] = []
+                if !productIDs.isEmpty {
+                    fetchedProducts = try await SupabaseService.shared.client
+                        .from("Product")
+                        .select()
+                        .in("id", values: productIDs)
+                        .execute()
+                        .value
+                }
+                
+                for sale in allRelevantSales {
+                    let items = fetchedItems.filter { $0.saleID == sale.id }
+                    let itemProdIDs = Set(items.map { $0.productID })
+                    let products = fetchedProducts.filter { itemProdIDs.contains($0.id) }
+                    displayDataList.append(SaleDisplayData(sale: sale, items: items, products: products))
+                }
+            }
+            
+            let thisMonthList = displayDataList.filter { data in
+                data.sale.saleDate >= startOfThisMonth
             }.sorted { $0.saleDate > $1.saleDate }
             
-            let thisYearList = allRelevantSales.filter { sale in
-                sale.saleDate >= startOfYear
+            let thisYearList = displayDataList.filter { data in
+                data.sale.saleDate >= startOfYear
             }.sorted { $0.saleDate > $1.saleDate }
             
             await MainActor.run {
-                self.lastMonthSales = lastMonthList
+                self.thisMonthSales = thisMonthList
                 self.thisYearSales = thisYearList
                 self.isLoading = false
             }

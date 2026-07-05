@@ -52,7 +52,7 @@ struct DailySalesDetailView: View {
                                     Task {
                                         await salesTargetViewModel.fetchSalesTargets(forStoreID: currentStoreID)
                                         let customTarget = salesTargetViewModel.weeklyTarget(for: newDate)
-                                        viewModel.selectWeek(viewModel.selectedWeek, customWeeklyTarget: customTarget, storeID: currentStoreID)
+                                        viewModel.selectDate(newDate, customWeeklyTarget: customTarget, storeID: currentStoreID)
                                     }
                                 }
                             
@@ -117,15 +117,17 @@ struct DailySalesDetailView: View {
                                 Spacer()
                                 
                                 HStack(spacing: 4) {
-                                    Image(systemName: comparison.percentageChange >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                        .font(.system(size: 14, weight: .bold))
+                                    if comparison.isDataAvailable {
+                                        Image(systemName: comparison.percentageChange >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                            .font(.system(size: 14, weight: .bold))
+                                    }
                                     Text(comparison.percentageString)
                                         .font(.system(size: 15, weight: .bold))
                                 }
-                                .foregroundColor(comparison.percentageChange >= 0 ? .green : .red)
+                                .foregroundColor(!comparison.isDataAvailable ? .secondary : (comparison.percentageChange >= 0 ? .green : .red))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(comparison.percentageChange >= 0 ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
+                                .background(!comparison.isDataAvailable ? Color.gray.opacity(0.1) : (comparison.percentageChange >= 0 ? Color.green.opacity(0.1) : Color.red.opacity(0.1)))
                                 .cornerRadius(8)
                             }
                             .padding(16)

@@ -43,25 +43,30 @@ enum VIPTier: String, Codable {
 }
 
 enum ProductCategory: String, Codable {
-    case apparel
-    case footwear
-    case accessories
-    case jewelry
-    case cosmetics
+    case handbags = "Handbags"
+    case fragrances = "Fragrances"
+    case accessories = "Accessories"
+    case jewellery = "Jewellery"
+    case watches = "Watches"
+    case footware = "Footware"
+    case general = "General"
     
-    // Database aligned categories
+    // Legacy/Main view categories
+    case apparel = "Apparel"
+    case footwear = "Footwear"
+    case jewelry = "Jewelry"
+    case cosmetics = "Cosmetics"
     case bag = "Bag"
     case perfume = "Perfume"
     case wallet = "Wallet"
     case ring = "Ring"
-    case general = "General"
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let raw = (try? container.decode(String.self)) ?? ""
         if let exact = ProductCategory(rawValue: raw) {
             self = exact
-        } else if let lower = ProductCategory(rawValue: raw.lowercased()) {
+        } else if let lower = ProductCategory(rawValue: raw.capitalized) {
             self = lower
         } else {
             self = .general
@@ -88,18 +93,24 @@ enum AppointmentStatus: String, Codable {
     case noShow
 }
 
-enum TransferRequestStatus: String, Codable, CaseIterable {
+enum TransferRequestStatus: String, Codable {
     case pending
-    case cancelled
+    case approved
+    case rejected
+    case inTransit
+    case completed
     case accepted
     case declined
-
+    case cancelled
+    
     var displayName: String {
         switch self {
         case .pending: return "Pending"
+        case .approved, .accepted: return "Approved"
+        case .rejected, .declined: return "Rejected"
+        case .inTransit: return "In Transit"
+        case .completed: return "Completed"
         case .cancelled: return "Cancelled"
-        case .accepted: return "Accepted"
-        case .declined: return "Declined"
         }
     }
 }
@@ -199,21 +210,13 @@ enum ShiftType: String, Codable {
         }
     }
 }
+// MARK: - Inventory-Specific Enums
 
-enum StoreRequestStatus: String, Codable, CaseIterable {
-
-    case pending = "pending"
-    case fulfilled = "fulfilled"
-    case rejected = "rejected"
-
-    var displayName: String {
-        switch self {
-        case .pending:
-            return "Pending"
-        case .fulfilled:
-            return "Fulfilled"
-        case .rejected:
-            return "Rejected"
-        }
-    }
+enum StoreRequestStatus: String, Codable, Hashable {
+    case pending
+    case approved
+    case rejected
+    case fulfilled
+    case cancelled
 }
+
