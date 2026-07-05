@@ -6,7 +6,7 @@ struct StoreRequestDetailView: View {
     var statusColor: Color {
         switch request.status {
         case .pending: return .orange
-        case .approved: return .green
+        case .forwarded: return .green
         case .rejected: return .red
         case .fulfilled: return .blue
         }

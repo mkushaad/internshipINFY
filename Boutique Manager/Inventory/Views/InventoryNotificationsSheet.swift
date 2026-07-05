@@ -1,56 +1,78 @@
 import SwiftUI
 
 struct InventoryNotificationsSheet: View {
-    @ObservedObject var viewModel: InventoryViewModel
+    @ObservedObject var notificationManager = NotificationManager.shared
     @Environment(\.dismiss) private var dismiss
 
-    @State private var activeNotifications: [StockAlertPreview] = []
+    @State private var selectedTab: NotificationTab = .unread
+
+    enum NotificationTab: String, CaseIterable, Identifiable {
+        case unread = "Unread"
+        case all = "History"
+        var id: String { self.rawValue }
+    }
+
+    var displayedNotifications: [InventoryNotification] {
+        switch selectedTab {
+        case .unread:
+            return notificationManager.unreadNotifications
+        case .all:
+            return notificationManager.readNotifications
+        }
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.themeBackground.ignoresSafeArea()
 
-                if activeNotifications.isEmpty {
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.themeAccent.opacity(0.1))
-                                .frame(width: 80, height: 80)
-
-                            Image(systemName: "bell.slash.fill")
-                                .font(.system(size: 36))
-                                .foregroundColor(.themeAccent)
+                VStack(spacing: 0) {
+                    // Segmented Filter Picker
+                    Picker("Notifications", selection: $selectedTab) {
+                        ForEach(NotificationTab.allCases) { tab in
+                            Text(tab == .unread ? "Unread (\(notificationManager.unreadCount))" : "History (\(notificationManager.readCount))")
+                                .tag(tab)
                         }
-
-                        Text("No New Notifications")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.themeText)
-
-                        Text("You're all caught up! New low stock alerts generated upon refresh will appear here.")
-                            .font(.system(size: 13))
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("\(activeNotifications.count) NEW ALERT\(activeNotifications.count > 1 ? "S" : "")")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.gray)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 4)
-                            .padding(.top, 8)
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
 
-                            ForEach(activeNotifications) { alert in
-                                NotificationAlertRow(alert: alert)
+                    if displayedNotifications.isEmpty {
+                        VStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.themeAccent.opacity(0.1))
+                                    .frame(width: 80, height: 80)
+
+                                Image(systemName: "bell.slash.fill")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(.themeAccent)
                             }
+
+                            Text(selectedTab == .unread ? "No Unread Notifications" : "No Notification History")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.themeText)
+
+                            Text(selectedTab == .unread ? "You are all caught up! New alerts created during refresh will appear here." : "Viewed or dismissed notifications will be stored here.")
+                                .font(.system(size: 13))
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
                         }
-                        .padding(16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                ForEach(displayedNotifications) { notification in
+                                    NotificationCardRow(notification: notification) {
+                                        notificationManager.markAsRead(id: notification.id)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 20)
+                        }
                     }
                 }
             }
@@ -59,75 +81,107 @@ struct InventoryNotificationsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        viewModel.markNotificationsAsViewed()
+                        notificationManager.markAllAsRead()
                         dismiss()
                     }
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.themeAccent)
                 }
             }
-            .onAppear {
-                // Store active notifications for viewing
-                activeNotifications = viewModel.unreadNotifications
-            }
             .onDisappear {
-                // Empty notifications once viewed
-                viewModel.markNotificationsAsViewed()
+                // Automatically transition unread notifications to read status upon closing/viewing
+                notificationManager.markAllAsRead()
             }
         }
     }
 }
 
-// MARK: - Notification Alert Row Component
-struct NotificationAlertRow: View {
-    let alert: StockAlertPreview
+// MARK: - Notification Card Row Component (Clean, Untruncated Product Name & Details)
+struct NotificationCardRow: View {
+    let notification: InventoryNotification
+    let onTap: () -> Void
 
     var badgeColor: Color {
-        switch alert.status {
-        case .outOfStock, .critical: return .red
-        case .warning: return .orange
+        switch notification.type {
+        case .outOfStock:
+            return .red
+        case .lowStock:
+            return .orange
+        case .stockTransfer:
+            return .themeAccent
+        }
+    }
+
+    var badgeIcon: String {
+        switch notification.type {
+        case .outOfStock:
+            return "exclamationmark.triangle.fill"
+        case .lowStock:
+            return "shippingbox.fill"
+        case .stockTransfer:
+            return "arrow.left.arrow.right.circle.fill"
         }
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(badgeColor.opacity(0.1))
-                    .frame(width: 48, height: 48)
+        Button(action: onTap) {
+            HStack(alignment: .center, spacing: 14) {
+                // Category Icon Container
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(badgeColor.opacity(0.1))
+                        .frame(width: 48, height: 48)
 
-                Image(systemName: alert.status == .outOfStock ? "exclamationmark.triangle.fill" : "bell.badge.fill")
-                    .font(.system(size: 20))
+                    Image(systemName: badgeIcon)
+                        .font(.system(size: 20))
+                        .foregroundColor(badgeColor)
+                }
+
+                // Untruncated Product Name & Relative Sent Timestamp
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(notification.productName)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.themeText)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if notification.status == .unread {
+                            Circle()
+                                .fill(Color.blue)
+                                .frame(width: 7, height: 7)
+                        }
+                    }
+
+                    Text(notification.createdAt.timeAgoString())
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
+
+                Spacer(minLength: 8)
+
+                // Alert Type Tag (Low Stock / Out of Stock / Stock Transfer)
+                Text(notification.type.rawValue)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(badgeColor)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .background(badgeColor.opacity(0.12))
+                    .cornerRadius(12)
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(alert.productName)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.themeText)
-
-                Text(alert.currentQuantity == 0 ? "Current Quantity: 0 (Out of Stock)" : "Current Quantity: \(alert.currentQuantity) units")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Text("Low Stock")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.orange)
-                .padding(.vertical, 4)
-                .padding(.horizontal, 10)
-                .background(Color.orange.opacity(0.12))
-                .cornerRadius(12)
+            .padding(14)
+            .background(notification.status == .unread ? Color.white : Color.white.opacity(0.75))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(notification.status == .unread ? Color.blue.opacity(0.2) : Color.clear, lineWidth: 1)
+            )
         }
-        .padding(14)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
 #Preview {
-    InventoryNotificationsSheet(viewModel: InventoryViewModel())
+    InventoryNotificationsSheet()
 }

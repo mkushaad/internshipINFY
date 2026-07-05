@@ -1,14 +1,19 @@
 import SwiftUI
 
 struct StoreInventoryView: View {
-    @StateObject private var viewModel = StoreInventoryViewModel()
+    @StateObject private var viewModel: StoreInventoryViewModel
+    @State private var showFilterPanel: Bool = false
+
+    init(initialFilterLowStock: Bool = false) {
+        _viewModel = StateObject(wrappedValue: StoreInventoryViewModel(initialFilterLowStock: initialFilterLowStock))
+    }
 
     var body: some View {
         ZStack {
             Color.themeBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Header Search & Sort Bar
+                // Header Search & Filter Control Bar
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         // Search Input Bar
@@ -17,7 +22,7 @@ struct StoreInventoryView: View {
                                 .foregroundColor(.gray)
                                 .font(.system(size: 14))
 
-                            TextField("Search by name, SKU, or brand...", text: $viewModel.searchText)
+                            TextField("Search product or SKU...", text: $viewModel.searchText)
                                 .font(.system(size: 14))
                                 .foregroundColor(.themeText)
 
@@ -31,29 +36,123 @@ struct StoreInventoryView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 10)
                         .padding(.horizontal, 12)
                         .background(Color.themeBackground)
-                        .cornerRadius(10)
+                        .cornerRadius(12)
 
-                        // Sort Menu Button (Icon only)
-                        Menu {
-                            Picker("Sort By", selection: $viewModel.selectedSortOption) {
-                                ForEach(StoreInventorySortOption.allCases) { option in
-                                    Text(option.rawValue).tag(option)
+                        // Gold Slider Filter Toggle Button (Matching Screenshot Aesthetic)
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showFilterPanel.toggle()
+                            }
+                        }) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.themeAccent)
+                                    .frame(width: 40, height: 40)
+
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+
+                                if viewModel.selectedFilter != .all || viewModel.selectedSortOption != .alphabetical || viewModel.sortDirection != .ascending {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 12, y: -12)
                                 }
                             }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.themeAccent)
-                                .frame(width: 36, height: 36)
-                                .background(Color.themeBackground)
-                                .cornerRadius(10)
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.top, 10)
+                    .padding(.bottom, showFilterPanel ? 4 : 10)
+
+                    // Collapsible Filter Panel (Styled precisely like screenshot)
+                    if showFilterPanel {
+                        VStack(alignment: .leading, spacing: 14) {
+                            // Section 1: STOCK AVAILABILITY / ALERT TYPE
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("STOCK AVAILABILITY")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.gray)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(InventoryFilterOption.allCases) { option in
+                                            PillFilterTag(
+                                                title: option.rawValue,
+                                                isSelected: viewModel.selectedFilter == option
+                                            ) {
+                                                viewModel.selectedFilter = option
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Section 2: SORT BY
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("SORT BY")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.gray)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(StoreInventorySortOption.allCases) { option in
+                                            PillFilterTag(
+                                                title: option.rawValue,
+                                                isSelected: viewModel.selectedSortOption == option
+                                            ) {
+                                                viewModel.selectedSortOption = option
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Section 3: SORT ORDER (Ascending / Descending)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("SORT ORDER")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.gray)
+
+                                HStack(spacing: 8) {
+                                    ForEach(SortDirection.allCases) { direction in
+                                        PillFilterTag(
+                                            title: direction.rawValue,
+                                            isSelected: viewModel.sortDirection == direction
+                                        ) {
+                                            viewModel.sortDirection = direction
+                                        }
+                                    }
+                                }
+                            }
+
+                            if viewModel.selectedFilter != .all || !viewModel.searchText.isEmpty || viewModel.selectedSortOption != .alphabetical || viewModel.sortDirection != .ascending {
+                                HStack {
+                                    Spacer()
+                                    Button("Reset All Filters") {
+                                        viewModel.clearFilters()
+                                        viewModel.selectedSortOption = .alphabetical
+                                        viewModel.sortDirection = .ascending
+                                    }
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.red)
+                                }
+                                .padding(.top, 2)
+                            }
+                        }
+                        .padding(14)
+                        .background(Color.white)
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
                 .background(Color.white)
                 .shadow(color: Color.black.opacity(0.02), radius: 3, x: 0, y: 1)
@@ -139,8 +238,8 @@ struct StoreInventoryView: View {
                             .font(.system(size: 15, weight: .medium))
                             .foregroundColor(.gray)
 
-                        Button("Clear Search") {
-                            viewModel.searchText = ""
+                        Button("Clear Filters & Search") {
+                            viewModel.clearFilters()
                         }
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.themeAccent)
@@ -170,13 +269,22 @@ struct StoreInventoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    Task {
-                        await viewModel.fetchStoreInventory()
+                HStack(spacing: 16) {
+                    Button(action: {
+                        Task {
+                            await viewModel.fetchStoreInventory()
+                        }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.themeAccent)
                     }
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.themeAccent)
+                    
+                    NavigationLink(destination: AddProductView()) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(.themeAccent)
+                    }
                 }
             }
         }
@@ -272,6 +380,28 @@ struct StoreInventoryRow: View {
         Image(systemName: "shippingbox.fill")
             .font(.system(size: 26))
             .foregroundColor(.themeAccent)
+    }
+}
+
+// MARK: - Pill Filter Tag Component (Matching Design Screenshot)
+struct PillFilterTag: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                .foregroundColor(isSelected ? .white : .themeText)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .background(
+                    isSelected ? Color.themeAccent : Color.gray.opacity(0.1)
+                )
+                .cornerRadius(20)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

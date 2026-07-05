@@ -261,6 +261,40 @@ struct InventoryOverviewView: View {
                     .padding(.bottom, 20)
                 }
             }
+            
+            // Toast Success Banner Overlay
+            if viewModel.showSuccessToast {
+                VStack {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.system(size: 18))
+                        
+                        Text(viewModel.successToastMessage)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.black.opacity(0.85))
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                        withAnimation {
+                            viewModel.showSuccessToast = false
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle("Alerts and Requests")
         .navigationBarTitleDisplayMode(.inline)

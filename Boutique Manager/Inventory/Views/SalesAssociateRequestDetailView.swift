@@ -1,19 +1,13 @@
 import SwiftUI
 
-struct StockAlertDetailView: View {
+struct SalesAssociateRequestDetailView: View {
     let alert: StockAlert
     @ObservedObject var viewModel: InventoryOverviewViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @State private var showCreateRequestForm = false
     @State private var managerRemark: String = ""
     @State private var salesAssociateName: String = ""
     @State private var isSubmittingDecline = false
-    @State private var isSubmittingAccept = false
-    
-    var isTransferRequest: Bool {
-        alert.alertType == .transferRequested || alert.source == .salesAssociate
-    }
     
     var body: some View {
         ZStack {
@@ -29,9 +23,28 @@ struct StockAlertDetailView: View {
                                 .fill(Color.themeAccent.opacity(0.1))
                                 .frame(width: 72, height: 72)
                             
-                            Image(systemName: isTransferRequest ? "arrow.left.arrow.right" : "shippingbox.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(.themeAccent)
+                            if let imageUrlString = alert.imageUrl,
+                               let url = URL(string: imageUrlString),
+                               !imageUrlString.isEmpty {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 48, height: 48)
+                                            .cornerRadius(8)
+                                    default:
+                                        Image(systemName: "arrow.left.arrow.right")
+                                            .font(.system(size: 28))
+                                            .foregroundColor(.themeAccent)
+                                    }
+                                }
+                            } else {
+                                Image(systemName: "arrow.left.arrow.right")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.themeAccent)
+                            }
                         }
                         
                         VStack(spacing: 4) {
@@ -47,20 +60,12 @@ struct StockAlertDetailView: View {
                     }
                     .padding(.vertical, 6)
                     
-                    // Alert Specification Details Card
-                    DetailSection(title: "Alert Information") {
+                    // Request Specification Details Card
+                    DetailSection(title: "Sales Associate Request Details") {
                         InfoRow(
-                            title: "Alert Type",
-                            value: alert.alertType.rawValue,
-                            isBoldValue: true,
-                            valueColor: alert.alertType == .outOfStock ? .red : .themeText
-                        )
-                        Divider().background(Color.themeText.opacity(0.06))
-                        
-                        InfoRow(
-                            title: "Source",
-                            value: isTransferRequest ? (salesAssociateName.isEmpty ? alert.source.rawValue : salesAssociateName) : alert.source.rawValue,
-                            isBoldValue: isTransferRequest && !salesAssociateName.isEmpty
+                            title: "Requested By",
+                            value: salesAssociateName.isEmpty ? (alert.salesAssociateName ?? "Sales Associate") : salesAssociateName,
+                            isBoldValue: true
                         )
                         Divider().background(Color.themeText.opacity(0.06))
                         
@@ -73,47 +78,55 @@ struct StockAlertDetailView: View {
                         Divider().background(Color.themeText.opacity(0.06))
                         
                         InfoRow(
-                            title: "Current Quantity",
+                            title: "Quantity Available",
                             value: alert.currentQuantity == 0 ? "Out of Stock" : "\(alert.currentQuantity) units",
                             isBoldValue: true,
                             valueColor: alert.currentQuantity == 0 ? .red : .themeText
                         )
                         Divider().background(Color.themeText.opacity(0.06))
                         
-                        // Highlighted Requested Quantity for Transfer Requests
-                        if let reqQty = alert.quantityRequested {
-                            HStack(alignment: .center) {
-                                Text("Requested Quantity")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.gray)
-                                    .frame(width: 140, alignment: .leading)
-                                
-                                Spacer()
-                                
-                                HStack(spacing: 6) {
-                                    Image(systemName: "arrow.up.right.square.fill")
-                                        .font(.system(size: 11))
-                                    Text("\(reqQty) units")
-                                        .font(.system(size: 13, weight: .bold))
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
-                                .background(Color.themeAccent.opacity(0.15))
-                                .foregroundColor(.themeAccent)
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.themeAccent.opacity(0.3), lineWidth: 1)
-                                )
+                        // Requested Quantity
+                        HStack(alignment: .center) {
+                            Text("Quantity Requested")
+                                .font(.system(size: 13))
+                                .foregroundColor(.gray)
+                                .frame(width: 140, alignment: .leading)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up.right.square.fill")
+                                    .font(.system(size: 11))
+                                Text("\(alert.quantityRequested ?? 1) units")
+                                    .font(.system(size: 13, weight: .bold))
                             }
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(Color.themeAccent.opacity(0.15))
+                            .foregroundColor(.themeAccent)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.themeAccent.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .padding(.vertical, 8)
+                        Divider().background(Color.themeText.opacity(0.06))
+                        
+                        if let status = alert.requestStatus {
+                            InfoRow(
+                                title: "Status",
+                                value: status.displayName,
+                                isBoldValue: true,
+                                valueColor: status == .pending ? .orange : (status == .fulfilled ? .green : .red)
+                            )
                             Divider().background(Color.themeText.opacity(0.06))
                         }
                         
                         InfoRow(title: "Request Date", value: alert.generatedAt.formattedString())
                     }
                     
-                    // Remarks Text Field Section (Updates SalesAssociateStockRequest.managerremark)
+                    // Remarks Section
                     DetailSection(title: "Manager Remarks") {
                         VStack(alignment: .leading, spacing: 8) {
                             TextEditor(text: $managerRemark)
@@ -147,17 +160,13 @@ struct StockAlertDetailView: View {
                     
                     Spacer(minLength: 16)
                     
-                    // Horizontal Action Buttons (No background container behind them)
+                    // Horizontal Action Buttons
                     HStack(spacing: 12) {
-                        // Decline / Ignore Button
+                        // Decline Button
                         Button(action: {
                             Task {
                                 isSubmittingDecline = true
-                                if isTransferRequest {
-                                    await viewModel.declineSalesAssociateRequest(requestId: alert.id, managerRemark: managerRemark)
-                                } else {
-                                    viewModel.ignoreAlert(id: alert.id)
-                                }
+                                await viewModel.declineSalesAssociateRequest(requestId: alert.id, managerRemark: managerRemark)
                                 isSubmittingDecline = false
                                 dismiss()
                             }
@@ -169,7 +178,7 @@ struct StockAlertDetailView: View {
                                 } else {
                                     Image(systemName: "xmark.circle.fill")
                                         .font(.system(size: 15))
-                                    Text(isTransferRequest ? "Decline" : "Ignore")
+                                    Text("Decline")
                                         .font(.system(size: 15, weight: .bold))
                                 }
                             }
@@ -185,29 +194,13 @@ struct StockAlertDetailView: View {
                         }
                         .disabled(isSubmittingDecline)
 
-                        // Accept Button
-                        Button(action: {
-                            if isTransferRequest {
-                                Task {
-                                    isSubmittingAccept = true
-                                    await viewModel.acceptSalesAssociateRequest(requestId: alert.id, managerRemark: managerRemark)
-                                    isSubmittingAccept = false
-                                    dismiss()
-                                }
-                            } else {
-                                showCreateRequestForm = true
-                            }
-                        }) {
+                        // Review Stores Navigation Button
+                        NavigationLink(destination: ReviewNearbyStoresView(alert: alert)) {
                             HStack(spacing: 6) {
-                                if isSubmittingAccept {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 15))
-                                    Text("Accept")
-                                        .font(.system(size: 15, weight: .bold))
-                                }
+                                Image(systemName: "location.magnifyingglass")
+                                    .font(.system(size: 15))
+                                Text("Review Stores")
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -216,7 +209,8 @@ struct StockAlertDetailView: View {
                             .cornerRadius(12)
                             .shadow(color: Color.themeAccent.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
-                        .disabled(isSubmittingAccept || isSubmittingDecline)
+                        .buttonStyle(.plain)
+                        .disabled(isSubmittingDecline)
                     }
                     .padding(.horizontal, 4)
                     .padding(.bottom, 20)
@@ -224,7 +218,7 @@ struct StockAlertDetailView: View {
                 .padding()
             }
         }
-        .navigationTitle("Alert Details")
+        .navigationTitle("Request Details")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if managerRemark.isEmpty {
@@ -239,30 +233,25 @@ struct StockAlertDetailView: View {
                 salesAssociateName = await viewModel.fetchUserName(userId: userId)
             }
         }
-        .sheet(isPresented: $showCreateRequestForm) {
-            CreateStoreRequestView(alert: alert, overviewViewModel: viewModel) {
-                dismiss()
-            }
-        }
     }
 }
 
 #Preview {
     NavigationStack {
-        StockAlertDetailView(
+        SalesAssociateRequestDetailView(
             alert: StockAlert(
                 id: UUID(),
-                productName: "Signature Fragrance",
-                sku: "SKU-PER-001",
-                currentQuantity: 17,
+                productName: "Hermès Birkin 30 Gold",
+                sku: "HRM-BRK-001",
+                currentQuantity: 3,
                 alertType: .transferRequested,
                 priority: .high,
                 source: .salesAssociate,
                 generatedAt: Date(),
-                description: "Stock request submitted by Sales Associate",
-                quantityRequested: 5,
+                description: "Customer waiting in store.",
+                quantityRequested: 1,
                 requestedBy: UUID(),
-                salesAssociateName: "Sarah Jenkins"
+                salesAssociateName: "Elena Rostova"
             ),
             viewModel: InventoryOverviewViewModel()
         )

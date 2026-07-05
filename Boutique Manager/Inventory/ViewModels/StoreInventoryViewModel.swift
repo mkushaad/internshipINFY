@@ -8,17 +8,35 @@ class StoreInventoryViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
     @Published var searchText: String = ""
+    @Published var selectedFilter: InventoryFilterOption = .all
     @Published var selectedSortOption: StoreInventorySortOption = .alphabetical
+    @Published var sortDirection: SortDirection = .ascending
 
-    init() {
+    init(initialFilterLowStock: Bool = false) {
+        self.selectedFilter = initialFilterLowStock ? .lowStock : .all
         Task {
             await fetchStoreInventory()
         }
     }
 
+    func clearFilters() {
+        selectedFilter = .all
+        searchText = ""
+    }
+
     // MARK: - Computed Filtered and Sorted Items
     var filteredAndSortedItems: [StoreInventoryItem] {
         var items = inventoryItems
+
+        // Filter by selected option
+        switch selectedFilter {
+        case .all:
+            break
+        case .lowStock:
+            items = items.filter { $0.inventory.currentquantity <= $0.inventory.thresholdquantity }
+        case .noStock:
+            items = items.filter { $0.inventory.currentquantity == 0 }
+        }
 
         // Search filtering (Product Name, SKU, Brand)
         if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -33,14 +51,19 @@ class StoreInventoryViewModel: ObservableObject {
         // Sorting
         switch selectedSortOption {
         case .alphabetical:
-            items.sort { $0.product.name.localizedCaseInsensitiveCompare($1.product.name) == .orderedAscending }
+            items.sort {
+                let comparison = $0.product.name.localizedCaseInsensitiveCompare($1.product.name)
+                return sortDirection == .ascending ? (comparison == .orderedAscending) : (comparison == .orderedDescending)
+            }
         case .quantity:
-            items.sort { $0.inventory.currentquantity > $1.inventory.currentquantity }
+            items.sort {
+                sortDirection == .ascending ? ($0.inventory.currentquantity < $1.inventory.currentquantity) : ($0.inventory.currentquantity > $1.inventory.currentquantity)
+            }
         case .recentlyUpdated:
             items.sort {
                 let dateA = $0.inventory.updatedat ?? $0.product.updatedAt ?? Date.distantPast
                 let dateB = $1.inventory.updatedat ?? $1.product.updatedAt ?? Date.distantPast
-                return dateA > dateB
+                return sortDirection == .ascending ? (dateA < dateB) : (dateA > dateB)
             }
         }
 

@@ -119,11 +119,28 @@ struct StoreInventoryItem: Identifiable {
     }
 }
 
+// MARK: - Filter Options
+enum InventoryFilterOption: String, CaseIterable, Identifiable {
+    case all = "All Items"
+    case lowStock = "Low Stock"
+    case noStock = "No Stock"
+
+    var id: String { self.rawValue }
+}
+
 // MARK: - Sorting Options
 enum StoreInventorySortOption: String, CaseIterable, Identifiable {
     case alphabetical = "Alphabetically"
     case quantity = "Current Quantity"
     case recentlyUpdated = "Recently Updated"
+
+    var id: String { self.rawValue }
+}
+
+// MARK: - Sort Direction Options
+enum SortDirection: String, CaseIterable, Identifiable {
+    case ascending = "Ascending"
+    case descending = "Descending"
 
     var id: String { self.rawValue }
 }

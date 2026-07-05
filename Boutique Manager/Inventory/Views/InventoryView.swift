@@ -2,8 +2,8 @@ import SwiftUI
 
 struct InventoryView: View {
     @StateObject private var viewModel = InventoryViewModel()
+    @ObservedObject private var notificationManager = NotificationManager.shared
     @State private var showNotificationSheet = false
-    @State private var isSettingsPresented = false
     @State private var selectedSegment: InventorySegment = .alerts
     
     enum InventorySegment: String, CaseIterable, Identifiable {
@@ -25,7 +25,13 @@ struct InventoryView: View {
                 // Background color matching standard theme
                 Color.themeBackground.ignoresSafeArea()
                 
-                ScrollView {
+                if viewModel.isLoading {
+                    ProgressView("Loading inventory...")
+                        .progressViewStyle(CircularProgressViewStyle(tint: .themeAccent))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.gray)
+                } else {
+                    ScrollView {
                         VStack(spacing: 20) {
                             
                             // Section 1 — Inventory Summary KPI cards (with interactive navigation links for Products and Discrepancies)
@@ -40,19 +46,25 @@ struct InventoryView: View {
                                 }
                                 .buttonStyle(.plain)
                                 
-                                InventorySummaryCard(
-                                    title: "Low Stock",
-                                    value: "\(viewModel.summary.lowStockCount)",
-                                    iconName: "exclamationmark.triangle.fill",
-                                    iconColor: .red
-                                )
+                                NavigationLink(destination: LowStockAlertsView()) {
+                                    InventorySummaryCard(
+                                        title: "Low Stock",
+                                        value: "\(viewModel.summary.lowStockCount)",
+                                        iconName: "exclamationmark.triangle.fill",
+                                        iconColor: .red
+                                    )
+                                }
+                                .buttonStyle(.plain)
                                 
-                                InventorySummaryCard(
-                                    title: "Stock Requests",
-                                    value: "\(viewModel.summary.stockRequestsCount)",
-                                    iconName: "arrow.left.arrow.right",
-                                    iconColor: .blue
-                                )
+                                NavigationLink(destination: StockRequestsView()) {
+                                    InventorySummaryCard(
+                                        title: "Stock Requests",
+                                        value: "\(viewModel.summary.stockRequestsCount)",
+                                        iconName: "arrow.left.arrow.right",
+                                        iconColor: .blue
+                                    )
+                                }
+                                .buttonStyle(.plain)
                                 
                                 NavigationLink(destination: InventoryDiscrepanciesView()) {
                                     InventorySummaryCard(
@@ -73,12 +85,21 @@ struct InventoryView: View {
                                 
                                 Spacer()
                                 
-                                NavigationLink(destination: InventoryOverviewView()) {
-                                    Text("View All")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundColor(.themeAccent)
+                                if selectedSegment == .alerts {
+                                    NavigationLink(destination: LowStockAlertsView()) {
+                                        Text("View All")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.themeAccent)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    NavigationLink(destination: StockRequestsView()) {
+                                        Text("View All")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.themeAccent)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                             .padding(.horizontal, 4)
                             .padding(.top, 8)
@@ -142,14 +163,13 @@ struct InventoryView: View {
                         .padding()
                         .padding(.bottom, 20)
                     }
-                    .redacted(reason: viewModel.isLoading ? .placeholder : [])
+                }
             }
             .navigationTitle("Inventory")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
-                        // Notification button with number badge count circle
                         Button(action: {
                             showNotificationSheet = true
                         }) {
@@ -157,51 +177,41 @@ struct InventoryView: View {
                                 Image(systemName: "bell")
                                     .font(.system(size: 18))
                                     .foregroundColor(.themeAccent)
+                                    .padding(.top, 4)
+                                    .padding(.trailing, 6)
 
-                                if viewModel.hasUnreadNotifications && !viewModel.unreadNotifications.isEmpty {
-                                    Text("\(viewModel.unreadNotifications.count)")
-                                        .font(.system(size: 9, weight: .bold))
+                                if notificationManager.unreadCount > 0 {
+                                    Text("\(notificationManager.unreadCount)")
+                                        .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(.white)
-                                        .frame(width: 15, height: 15)
+                                        .frame(width: 16, height: 16)
                                         .background(Circle().fill(Color.red))
-                                        .offset(x: 8, y: -6)
+                                        .offset(x: 4, y: 0)
                                 }
                             }
                         }
-                        
-                        // Refresh button
+
                         Button(action: {
                             Task {
                                 await viewModel.refresh()
                             }
                         }) {
                             Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.themeAccent)
-                        }
-                        
-                        // Settings Profile Icon
-                        Button(action: {
-                            isSettingsPresented = true
-                        }) {
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 22))
-                                .foregroundColor(.themeText)
                         }
                     }
                 }
             }
             .sheet(isPresented: $showNotificationSheet) {
-                InventoryNotificationsSheet(viewModel: viewModel)
+                InventoryNotificationsSheet()
             }
-            .sheet(isPresented: $isSettingsPresented) {
-                SettingsView()
+            .preferredColorScheme(.light)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .task {
+                await viewModel.fetchLiveSummary()
             }
-        }
-        .preferredColorScheme(.light)
-        .toolbarColorScheme(.light, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .task {
-            await viewModel.fetchLiveSummary()
         }
     }
 }

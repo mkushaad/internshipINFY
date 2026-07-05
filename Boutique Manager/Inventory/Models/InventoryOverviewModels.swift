@@ -44,6 +44,14 @@ struct StockAlert: Identifiable, Codable {
     let generatedAt: Date
     let description: String
     var imageUrl: String? = nil
+    var quantityRequested: Int? = nil
+    var requestStatus: RequestStatus? = nil
+    var requestedBy: UUID? = nil
+    var managerRemark: String? = nil
+    var salesAssociateName: String? = nil
+    var productID: UUID? = nil
+    var thresholdQuantity: Int? = nil
+    var storeID: UUID? = nil
 }
 
 // MARK: - User Defined Models & Enums for StoreRequest
@@ -76,19 +84,18 @@ struct StoreRequest: Identifiable, Codable, Hashable {
 enum RequestType: String, Codable, CaseIterable {
     case refill = "Refill"
     case transfer = "Transfer"
-    case inTransit = "In Transit"
 }
 
 enum RequestStatus: String, Codable, CaseIterable {
     case pending = "pending"
-    case approved = "approved"
+    case forwarded = "forwarded"
     case rejected = "rejected"
     case fulfilled = "fulfilled"
 
     var displayName: String {
         switch self {
         case .pending: return "Pending"
-        case .approved: return "Approved"
+        case .forwarded: return "Forwarded"
         case .rejected: return "Rejected"
         case .fulfilled: return "Fulfilled"
         }

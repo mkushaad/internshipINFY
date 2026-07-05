@@ -2,17 +2,19 @@ import SwiftUI
 
 struct CreateStoreRequestView: View {
     let alert: StockAlert
-    @ObservedObject var viewModel: InventoryOverviewViewModel
+    @ObservedObject var overviewViewModel: InventoryOverviewViewModel
+    @StateObject private var viewModel: CreateStoreRequestViewModel
     @Environment(\.dismiss) private var dismiss
-    
-    // Form Input States
-    @State private var selectedType: RequestType = .refill
-    @State private var selectedPriority: Priority = .normal
-    @State private var quantity: Int = 5
-    @State private var explanationText: String = ""
     
     // Callback to dismiss parent details screen
     var onCompletion: () -> Void
+    
+    init(alert: StockAlert, overviewViewModel: InventoryOverviewViewModel, onCompletion: @escaping () -> Void) {
+        self.alert = alert
+        self.overviewViewModel = overviewViewModel
+        self._viewModel = StateObject(wrappedValue: CreateStoreRequestViewModel(alert: alert))
+        self.onCompletion = onCompletion
+    }
     
     var body: some View {
         NavigationStack {
@@ -36,13 +38,24 @@ struct CreateStoreRequestView: View {
                             Text(alert.sku)
                                 .foregroundColor(.themeText)
                         }
+                        HStack {
+                            Text("Current Quantity")
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Text("\(alert.currentQuantity) units")
+                                .foregroundColor(alert.currentQuantity == 0 ? .red : .themeText)
+                                .fontWeight(alert.currentQuantity == 0 ? .bold : .regular)
+                        }
                     }
                     
                     Section(header: Text("Request Options")) {
-                        Picker("Request Type", selection: $selectedType) {
-                            ForEach(RequestType.allCases, id: \.self) { type in
-                                Text(type.rawValue).tag(type)
-                            }
+                        HStack {
+                            Text("Request Type")
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Text("Refill")
+                                .fontWeight(.semibold)
+                                .foregroundColor(.themeText)
                         }
                         
                         VStack(alignment: .leading, spacing: 8) {
@@ -50,7 +63,7 @@ struct CreateStoreRequestView: View {
                                 .font(.system(size: 13))
                                 .foregroundColor(.gray)
                             
-                            Picker("Priority", selection: $selectedPriority) {
+                            Picker("Priority", selection: $viewModel.selectedPriority) {
                                 ForEach(Priority.allCases, id: \.self) { prio in
                                     Text(prio.displayName).tag(prio)
                                 }
@@ -59,42 +72,37 @@ struct CreateStoreRequestView: View {
                         }
                         .padding(.vertical, 4)
                         
-                        Stepper(value: $quantity, in: 1...100) {
+                        Stepper(value: $viewModel.quantity, in: 1...1000) {
                             HStack {
                                 Text("Quantity Required")
                                     .foregroundColor(.gray)
                                 Spacer()
-                                Text("\(quantity) units")
+                                Text("\(viewModel.quantity) units")
                                     .fontWeight(.bold)
                                     .foregroundColor(.themeText)
                             }
                         }
                     }
-                    
-                    Section(header: Text("Explanation & Remarks")) {
-                        TextEditor(text: $explanationText)
-                            .frame(height: 100)
-                            .overlay(
-                                Group {
-                                    if explanationText.isEmpty {
-                                        VStack {
-                                            HStack {
-                                                Text("Explain the reason for this request...")
-                                                    .foregroundColor(.gray.opacity(0.6))
-                                                    .font(.system(size: 14))
-                                                    .padding(.top, 8)
-                                                    .padding(.leading, 4)
-                                                Spacer()
-                                            }
-                                            Spacer()
-                                        }
-                                    }
-                                }
-                            )
-                    }
                 }
                 .scrollContentBackground(.hidden)
                 .preferredColorScheme(.light)
+                
+                if viewModel.isSubmitting {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.2)
+                        Text("Sending Store Request...")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(20)
+                    .background(Color.black.opacity(0.75))
+                    .cornerRadius(12)
+                }
             }
             .navigationTitle("New Store Request")
             .navigationBarTitleDisplayMode(.inline)
@@ -104,34 +112,36 @@ struct CreateStoreRequestView: View {
                         dismiss()
                     }
                     .foregroundColor(.red)
+                    .disabled(viewModel.isSubmitting)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Send Request") {
-                        // Create a StoreRequest object
-                        let newRequest = StoreRequest(
-                            id: UUID().uuidString,
-                            requestType: selectedType,
-                            storeName: alert.source == .salesAssociate ? "Mumbai Flagship" : "Cupertino Headquarters",
-                            sku: alert.sku,
-                            productName: alert.productName,
-                            quantityRequested: quantity,
-                            priority: selectedPriority,
-                            managerRemark: explanationText.isEmpty ? nil : explanationText,
-                            status: .pending,
-                            createdAt: Date()
-                        )
-                        
-                        // Push into viewModel
-                        viewModel.convertAlertToStoreRequest(alertId: alert.id, request: newRequest)
-                        
-                        // Dismiss form and parent detail view
-                        dismiss()
-                        onCompletion()
+                    Button(action: {
+                        Task {
+                            let success = await viewModel.submitStoreRequest()
+                            if success {
+                                overviewViewModel.removeProcessedSystemAlert(id: alert.id)
+                                overviewViewModel.triggerSuccessToast(message: "Stock request sent to Inventory Controller.")
+                                dismiss()
+                                onCompletion()
+                            }
+                        }
+                    }) {
+                        if viewModel.isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text("Send")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.themeAccent)
+                        }
                     }
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.themeAccent)
+                    .disabled(viewModel.isSubmitting)
                 }
+            }
+            .alert("Failed to Send Request", isPresented: $viewModel.showErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(viewModel.errorMessage ?? "An error occurred while uploading the store request.")
             }
         }
     }
@@ -148,9 +158,11 @@ struct CreateStoreRequestView: View {
             priority: .high,
             source: .system,
             generatedAt: Date(),
-            description: "Rolex Daytona low stock level alert."
+            description: "Rolex Daytona low stock level alert.",
+            productID: UUID(),
+            thresholdQuantity: 8
         ),
-        viewModel: InventoryOverviewViewModel(),
+        overviewViewModel: InventoryOverviewViewModel(),
         onCompletion: {}
     )
 }

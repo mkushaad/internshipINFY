@@ -58,18 +58,8 @@ struct StockAlertsView: View {
     }
 }
 
-// MARK: - Stock Requests Placeholder View
-struct StockRequestsView: View {
-    var body: some View {
-        ModulePlaceholderContent(
-            title: "Stock Requests",
-            iconName: "arrow.left.arrow.right",
-            description: "Manage inbound and outbound inventory transfers between store locations, approve pending requests, and track shipping status."
-        )
-        .navigationTitle("Stock Requests")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
+// MARK: - Stock Requests Placeholder View (Deprecated in favor of StockRequestsView.swift)
+// struct StockRequestsView: View { ... }
 
 // MARK: - Inventory Discrepancies Placeholder View
 struct InventoryDiscrepanciesView: View {

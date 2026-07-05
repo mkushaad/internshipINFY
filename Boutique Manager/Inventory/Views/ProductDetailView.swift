@@ -97,6 +97,24 @@ struct ProductDetailView: View {
                     }
 
                     Spacer(minLength: 20)
+                    
+                    // Action Button: Add Stock
+                    NavigationLink(destination: NewProductRequestView(product: item.product)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.square.fill.on.square.fill")
+                                .font(.system(size: 15))
+                            Text("Add Stock")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.themeAccent)
+                        .cornerRadius(12)
+                        .shadow(color: Color.themeAccent.opacity(0.3), radius: 8, x: 0, y: 4)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 20)
                 }
                 .padding()
             }

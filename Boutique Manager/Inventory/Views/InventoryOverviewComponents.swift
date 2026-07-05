@@ -97,7 +97,7 @@ struct StoreRequestStatusBadge: View {
     var color: Color {
         switch status {
         case .pending: return .orange
-        case .approved: return .green
+        case .forwarded: return .green
         case .rejected: return .red
         case .fulfilled: return .blue
         }
@@ -122,7 +122,6 @@ struct StoreRequestTypeBadge: View {
         switch type {
         case .transfer: return .themeAccent
         case .refill: return .purple
-        case .inTransit: return .blue
         }
     }
     
@@ -143,9 +142,19 @@ struct StockAlertCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header Badges Row: Low Stock Tag (left) & System / Sales Associate Tag (right)
+            // Header Badges Row: Left Tag (Stock Transfer / Alert Type) & Right Tag (Source)
             HStack {
-                AlertTypeBadge(type: alert.alertType)
+                if alert.source == .salesAssociate || alert.quantityRequested != nil {
+                    Text("Stock Transfer")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 10)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(20)
+                } else {
+                    AlertTypeBadge(type: alert.alertType)
+                }
                 Spacer()
                 SourceBadge(source: alert.source)
             }
@@ -178,22 +187,43 @@ struct StockAlertCard: View {
                     }
                 }
                 
-                // Product Name & Current Quantity
-                VStack(alignment: .leading, spacing: 4) {
+                // Product Name & Side-by-Side Decluttered Stock Stats
+                VStack(alignment: .leading, spacing: 6) {
                     Text(alert.productName)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.themeText)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     
-                    HStack(spacing: 4) {
-                        Image(systemName: "box.truck.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.gray)
+                    // Decluttered Side-by-Side Stock Stats
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Text("Current:")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Text(alert.currentQuantity == 0 ? "Out of Stock" : "\(alert.currentQuantity)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(alert.currentQuantity == 0 ? .red : .themeText)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.gray.opacity(0.08))
+                        .cornerRadius(8)
 
-                        Text(alert.currentQuantity == 0 ? "Out of Stock" : "\(alert.currentQuantity) units in stock")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(alert.currentQuantity == 0 ? .red : .secondary)
+                        if let requestedQty = alert.quantityRequested {
+                            HStack(spacing: 4) {
+                                Text("Requested:")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.themeAccent)
+                                Text("\(requestedQty)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.themeAccent)
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .background(Color.themeAccent.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
                 }
                 
@@ -211,7 +241,7 @@ struct StockAlertCard: View {
     }
 
     private var fallbackIcon: some View {
-        Image(systemName: alert.alertType == .transferRequested ? "arrow.left.arrow.right" : "shippingbox.fill")
+        Image(systemName: alert.source == .salesAssociate ? "arrow.left.arrow.right.circle.fill" : "shippingbox.fill")
             .foregroundColor(.themeAccent)
             .font(.system(size: 24))
     }
