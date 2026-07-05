@@ -123,11 +123,7 @@ struct GuestRow: View {
     let invite: EventInvitation
     
     private var tierColor: Color {
-        switch (invite.client_profiles?.tier ?? "").lowercased() {
-        case "gold": return .themeAccent
-        case "platinum": return .themeText
-        default: return .secondary
-        }
+        return .secondary
     }
     
     var body: some View {
@@ -154,17 +150,6 @@ struct GuestRow: View {
             }
             
             Spacer()
-            
-            if let tier = invite.client_profiles?.tier {
-                Text(tier)
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(tierColor.opacity(0.15))
-                    .foregroundColor(tierColor)
-                    .cornerRadius(8)
-            }
         }
         .padding(14)
         .background(Color.themeCard)

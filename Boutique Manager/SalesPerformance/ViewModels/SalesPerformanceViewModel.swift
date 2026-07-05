@@ -106,9 +106,65 @@ class SalesPerformanceViewModel: ObservableObject {
         return calendar.date(byAdding: .day, value: daysOffset, to: startOfCurrentWeek) ?? Date()
     }
     
-    init() {
-        // Data is now fetched asynchronously via fetchSalesData
+    var detailedSalesList: [DetailedSaleItem] {
+        return mockSalesItems.compactMap { item in
+            guard let sale = mockSales.first(where: { $0.id == item.saleID }),
+                  let product = mockProducts.first(where: { $0.id == item.productID }) else {
+                return nil
+            }
+            
+            let iconName: String
+            switch product.category {
+            case .bag: iconName = "handbag.fill"
+            case .perfume: iconName = "drop.fill"
+            case .wallet: iconName = "creditcard.fill"
+            case .ring: iconName = "sparkles"
+            default: iconName = "cube.box.fill"
+            }
+            
+            return DetailedSaleItem(
+                productName: product.name,
+                category: product.category,
+                date: sale.saleDate,
+                units: item.quantity,
+                amount: item.subTotal,
+                iconName: iconName
+            )
+        }.sorted { $0.date > $1.date }
     }
+    
+    private func computePeakHours(for datePredicate: (Date) -> Bool) -> [PeakHourData] {
+        let relevantSales = mockSales.filter { datePredicate($0.saleDate) }
+        var hourRevenue: [Int: Double] = [:]
+        let calendar = Calendar.current
+        for sale in relevantSales {
+            let hour = calendar.component(.hour, from: sale.saleDate)
+            hourRevenue[hour, default: 0] += sale.totalAmount
+        }
+        
+        let sortedHours = hourRevenue.keys.sorted()
+        return sortedHours.map { hour in
+            let amPm = hour < 12 ? "AM" : "PM"
+            let displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour)
+            return PeakHourData(period: "\(displayHour) \(amPm)", revenue: hourRevenue[hour] ?? 0.0)
+        }
+    }
+    
+    var peakHoursYesterday: [PeakHourData] {
+        let calendar = Calendar.current
+        return computePeakHours { calendar.isDateInYesterday($0) }
+    }
+    
+    var peakHoursToday: [PeakHourData] {
+        let calendar = Calendar.current
+        return computePeakHours { calendar.isDateInToday($0) }
+    }
+    
+    var peakHoursThisWeek: [PeakHourData] {
+        return computePeakHours { _ in true } // uses all mockSales currently fetched for the selected week
+    }
+    
+    init() {}
     
     func selectWeek(_ week: String, customWeeklyTarget: Double? = nil, storeID: UUID) {
         selectedWeek = week

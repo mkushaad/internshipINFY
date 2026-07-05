@@ -120,3 +120,19 @@ struct PendingActionItem: Identifiable {
     let title: String
     let iconName: String
 }
+
+struct DetailedSaleItem: Identifiable, Equatable {
+    let id = UUID()
+    let productName: String
+    let category: ProductCategory
+    let date: Date
+    let units: Int
+    let amount: Double
+    let iconName: String
+}
+
+struct PeakHourData: Identifiable {
+    let id = UUID()
+    let period: String
+    let revenue: Double
+}

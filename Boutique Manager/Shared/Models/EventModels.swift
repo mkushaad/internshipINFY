@@ -36,6 +36,7 @@ struct VIPEvent: Identifiable, Codable {
     var date: Date
     var maxCapacity: Int
     var campaignID: UUID?
+    var targetTier: String? = nil
 }
 
 struct EventInvitation: Identifiable, Codable {
@@ -43,4 +44,5 @@ struct EventInvitation: Identifiable, Codable {
     var eventID: UUID
     var customerID: UUID
     var rsvpStatus: RSVPStatus
+    var client_profiles: ClientProfile? = nil
 }
