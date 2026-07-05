@@ -1,6 +1,4 @@
 import SwiftUI
-import Charts
-
 
 struct AssociateSalesHistoryView: View {
     let user: User
@@ -11,7 +9,7 @@ struct AssociateSalesHistoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("Timeframe", selection: $selectedTab) {
-                Text("This Month").tag(0)
+                Text("Last Month").tag(0)
                 Text("This Year").tag(1)
             }
             .pickerStyle(.segmented)
@@ -22,8 +20,8 @@ struct AssociateSalesHistoryView: View {
                 ProgressView("Fetching Sales...")
                 Spacer()
             } else {
-                let salesList = selectedTab == 0 ? viewModel.thisMonthSales : viewModel.thisYearSales
-                let total = selectedTab == 0 ? viewModel.thisMonthTotal : viewModel.thisYearTotal
+                let salesList = selectedTab == 0 ? viewModel.lastMonthSales : viewModel.thisYearSales
+                let total = selectedTab == 0 ? viewModel.lastMonthTotal : viewModel.thisYearTotal
                 
                 if salesList.isEmpty {
                     Spacer()
@@ -47,101 +45,9 @@ struct AssociateSalesHistoryView: View {
                             .background(Color.themeCard)
                             .cornerRadius(12)
                             
-                            // Chart Card
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Sales Trend")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.secondary)
-                                
-                                Chart {
-                                    if selectedTab == 0 {
-                                        let dailyTotals = Dictionary(grouping: salesList, by: { Calendar.current.startOfDay(for: $0.saleDate) })
-                                            .mapValues { $0.reduce(0, { sum, data in sum + data.totalAmount }) }
-                                        
-                                        ForEach(dailyTotals.keys.sorted(), id: \.self) { date in
-                                            LineMark(
-                                                x: .value("Date", date, unit: .day),
-                                                y: .value("Sales", dailyTotals[date]!)
-                                            )
-                                            .foregroundStyle(Color.themeAccent)
-                                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                                            
-                                            PointMark(
-                                                x: .value("Date", date, unit: .day),
-                                                y: .value("Sales", dailyTotals[date]!)
-                                            )
-                                            .foregroundStyle(Color.themeAccent)
-                                            
-                                            AreaMark(
-                                                x: .value("Date", date, unit: .day),
-                                                y: .value("Sales", dailyTotals[date]!)
-                                            )
-                                            .foregroundStyle(LinearGradient(gradient: Gradient(colors: [Color.themeAccent.opacity(0.3), Color.themeAccent.opacity(0.0)]), startPoint: .top, endPoint: .bottom))
-                                        }
-                                    } else {
-                                        let monthlyTotals = Dictionary(grouping: salesList, by: { 
-                                            Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: $0.saleDate))! 
-                                        })
-                                        .mapValues { $0.reduce(0, { sum, data in sum + data.totalAmount }) }
-                                        
-                                        ForEach(monthlyTotals.keys.sorted(), id: \.self) { date in
-                                            LineMark(
-                                                x: .value("Month", date, unit: .month),
-                                                y: .value("Sales", monthlyTotals[date]!)
-                                            )
-                                            .foregroundStyle(Color.themeAccent)
-                                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                                            
-                                            PointMark(
-                                                x: .value("Month", date, unit: .month),
-                                                y: .value("Sales", monthlyTotals[date]!)
-                                            )
-                                            .foregroundStyle(Color.themeAccent)
-                                            
-                                            AreaMark(
-                                                x: .value("Month", date, unit: .month),
-                                                y: .value("Sales", monthlyTotals[date]!)
-                                            )
-                                            .foregroundStyle(LinearGradient(gradient: Gradient(colors: [Color.themeAccent.opacity(0.3), Color.themeAccent.opacity(0.0)]), startPoint: .top, endPoint: .bottom))
-                                        }
-                                    }
-                                }
-                                .frame(height: 180)
-                                .chartXScale(domain: {
-                                    let now = Date()
-                                    let calendar = Calendar.current
-                                    if selectedTab == 0 {
-                                        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
-                                        let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-                                        return startOfMonth...endOfMonth
-                                    } else {
-                                        var comp = calendar.dateComponents([.year], from: now)
-                                        let startOfYear = calendar.date(from: comp)!
-                                        comp.year! += 1
-                                        comp.day = -1
-                                        let endOfYear = calendar.date(from: comp)!
-                                        return startOfYear...endOfYear
-                                    }
-                                }())
-                                .chartXAxis {
-                                    if selectedTab == 0 {
-                                        AxisMarks(values: .stride(by: .day, count: 5)) { value in
-                                            AxisValueLabel(format: .dateTime.day())
-                                        }
-                                    } else {
-                                        AxisMarks(values: .stride(by: .month)) { value in
-                                            AxisValueLabel(format: .dateTime.month(.narrow))
-                                        }
-                                    }
-                                }
-                            }
-                            .padding()
-                            .background(Color.themeCard)
-                            .cornerRadius(12)
-                            
                             // List of Sales
-                            ForEach(salesList) { data in
-                                SaleHistoryRow(displayData: data)
+                            ForEach(salesList) { sale in
+                                SaleHistoryRow(sale: sale)
                             }
                         }
                         .padding()
@@ -159,31 +65,19 @@ struct AssociateSalesHistoryView: View {
 }
 
 struct SaleHistoryRow: View {
-    let displayData: SaleDisplayData
+    let sale: Sale
     
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                let titleText: String = {
-                    if let firstProduct = displayData.products.first {
-                        if displayData.products.count > 1 {
-                            return "\(firstProduct.name) & \(displayData.products.count - 1) more"
-                        } else {
-                            return firstProduct.name
-                        }
-                    }
-                    return "Order #\(displayData.sale.id.uuidString.prefix(6))"
-                }()
-                
-                Text(titleText)
+                Text("Order #\(sale.id.uuidString.prefix(6))")
                     .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
-                Text(displayData.saleDate.formatted(date: .abbreviated, time: .shortened))
+                Text(sale.saleDate.formatted(date: .abbreviated, time: .shortened))
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Text(String(format: "$%.2f", displayData.totalAmount)) // Should use currency symbol in real app
+            Text(String(format: "$%.2f", sale.totalAmount)) // Should use currency symbol in real app
                 .font(.system(size: 16, weight: .bold))
         }
         .padding()

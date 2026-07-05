@@ -30,9 +30,9 @@ struct ContentView: View {
                         }
                         .tag(1)
                         .tag(2)
-                    EventsView()
+                    SettingsView()
                         .tabItem {
-                            Label("Events", systemImage: "ticket.fill")
+                            Label("Settings", systemImage: "gearshape")
                         }
                         .tag(3)
                 }

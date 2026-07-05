@@ -17,7 +17,6 @@ struct StaffView: View {
     @State private var showAddSheet = false
     @State private var searchText = ""
     @State private var showAllStaff = false
-    @State private var isSettingsPresented = false
 
     @State private var viewModel = StaffViewModel()
 
@@ -102,26 +101,16 @@ struct StaffView: View {
                     )
                 }
             }
-            .redacted(reason: (viewModel.isLoading && viewModel.liveStaff == nil) ? .placeholder : [])
             .scrollContentBackground(.hidden)
             .background(Color.themeBackground)
             .searchable(text: $searchText, prompt: "Search by name or email")
             .navigationTitle("Staff")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button {
-                            showAddSheet = true
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        
-                        Button {
-                            isSettingsPresented = true
-                        } label: {
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 22))
-                        }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showAddSheet = true
+                    } label: {
+                        Image(systemName: "plus")
                     }
                 }
             }
@@ -141,9 +130,6 @@ struct StaffView: View {
                         }
                     }
                 }
-            }
-            .sheet(isPresented: $isSettingsPresented) {
-                SettingsView()
             }
         }
         .preferredColorScheme(.light)

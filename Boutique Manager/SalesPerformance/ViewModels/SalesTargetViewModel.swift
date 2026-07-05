@@ -39,14 +39,8 @@ class SalesTargetViewModel {
     }
     
     func target(for weekStartDate: Date) -> StoreSalesTarget? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        let dateString = formatter.string(from: weekStartDate)
         return salesTargets.first { target in
-            if let start = target.startDate, let end = target.endDate {
-                return start <= dateString && end >= dateString
-            }
-            return target.isActive ?? false
+            target.startDate <= weekStartDate && target.endDate >= weekStartDate
         }
     }
     
@@ -59,8 +53,6 @@ class SalesTargetViewModel {
             return target.targetAmount / 16.0
         case .yearly:
             return target.targetAmount / 52.0
-        case .none:
-            return target.targetAmount / 4.0 // Fallback to monthly if not specified
         }
     }
 }

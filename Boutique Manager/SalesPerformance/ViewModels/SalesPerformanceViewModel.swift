@@ -9,9 +9,6 @@ class SalesPerformanceViewModel: ObservableObject {
     @Published var navigationTitle: String = "Weekly Sales Performance"
     @Published var navigationSubtitle: String = "Week 24 • Jun 16 – Jun 22"
     
-    // All Sales List
-    @Published var detailedSalesList: [DetailedSaleItem] = []
-    
     // Week Selection
     @Published var availableWeeks: [String] = ["Week 24 (Current)", "Week 23", "Week 22", "Week 21"]
     @Published var selectedWeek: String = "Week 24 (Current)"
@@ -115,34 +112,26 @@ class SalesPerformanceViewModel: ObservableObject {
     
     func selectWeek(_ week: String, customWeeklyTarget: Double? = nil, storeID: UUID) {
         selectedWeek = week
-        let start = startDate(for: week)
         Task {
-            await fetchSalesData(forStoreID: storeID, start: start, weekLabel: week.split(separator: " ").prefix(2).joined(separator: " "), customWeeklyTarget: customWeeklyTarget)
+            await fetchSalesData(forStoreID: storeID, week: week, customWeeklyTarget: customWeeklyTarget)
         }
     }
     
-    func selectDate(_ date: Date, customWeeklyTarget: Double? = nil, storeID: UUID) {
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
-        components.weekday = 2 // Monday
-        let start = calendar.date(from: components) ?? date
-        Task {
-            await fetchSalesData(forStoreID: storeID, start: start, referenceDate: date, weekLabel: "Custom Week", customWeeklyTarget: customWeeklyTarget)
-        }
-    }
-    
-    private func fetchSalesData(forStoreID storeID: UUID, start: Date, referenceDate: Date? = nil, weekLabel: String, customWeeklyTarget: Double? = nil) async {
+    func fetchSalesData(forStoreID storeID: UUID, week: String, customWeeklyTarget: Double? = nil) async {
         isLoading = true
         errorMessage = nil
+        selectedWeek = week
         
+        let start = startDate(for: week)
         let calendar = Calendar.current
         let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
         
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        navigationSubtitle = "\(weekLabel) • \(formatter.string(from: start)) – \(formatter.string(from: end))"
+        navigationSubtitle = "\(week.split(separator: " ").prefix(2).joined(separator: " ")) • \(formatter.string(from: start)) – \(formatter.string(from: end))"
         
-
+        loadMockCards(for: week)
+        
         do {
             let dateFormatter = ISO8601DateFormatter()
             dateFormatter.formatOptions = [.withFullDate]
@@ -162,19 +151,6 @@ class SalesPerformanceViewModel: ObservableObject {
             
             let saleIDs = fetchedSales.map { $0.id.uuidString }
             if !saleIDs.isEmpty {
-                let associateIDs = Set(fetchedSales.map { $0.salesAssociateID.uuidString })
-                if !associateIDs.isEmpty {
-                    let fetchedAssociates: [User] = try await SupabaseService.shared.client
-                        .from("User")
-                        .select()
-                        .in("id", values: Array(associateIDs))
-                        .execute()
-                        .value
-                    self.mockAssociates = fetchedAssociates
-                } else {
-                    self.mockAssociates = []
-                }
-                
                 let fetchedItems: [SalesItem] = try await SupabaseService.shared.client
                     .from("SalesItem")
                     .select()
@@ -199,10 +175,9 @@ class SalesPerformanceViewModel: ObservableObject {
             } else {
                 self.mockSalesItems = []
                 self.mockProducts = []
-                self.mockAssociates = []
             }
             
-            calculateMetrics(customWeeklyTarget: customWeeklyTarget, start: start, referenceDate: referenceDate)
+            calculateMetrics(for: week, customWeeklyTarget: customWeeklyTarget, start: start)
             self.isLoading = false
             
         } catch {
@@ -210,9 +185,10 @@ class SalesPerformanceViewModel: ObservableObject {
             self.isLoading = false
             print("Error fetching sales: \(error)")
             // Provide fallback calculations with empty data
-            calculateMetrics(customWeeklyTarget: customWeeklyTarget, start: start, referenceDate: referenceDate)
+            calculateMetrics(for: week, customWeeklyTarget: customWeeklyTarget, start: start)
         }
     }
+    
     private func loadMockCards(for week: String) {
         // Keep the mock data for VIP appointments, top performers, etc.
         switch week {

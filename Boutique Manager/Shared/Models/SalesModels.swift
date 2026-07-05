@@ -93,7 +93,6 @@ struct SalesItem: Identifiable, Codable {
     var quantity: Int
     var unitPrice: Double
     var subTotal: Double
-    var time: String?
 }
 
 struct SaleDisplayData: Identifiable {
@@ -103,20 +102,7 @@ struct SaleDisplayData: Identifiable {
     let products: [Product]
     
     var totalAmount: Double { sale.totalAmount }
-    var saleDate: Date {
-        guard let timeString = items.first?.time else { return sale.saleDate }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        if let timeDate = formatter.date(from: timeString) {
-            let calendar = Calendar.current
-            let timeComp = calendar.dateComponents([.hour, .minute, .second], from: timeDate)
-            return calendar.date(bySettingHour: timeComp.hour ?? 0,
-                                 minute: timeComp.minute ?? 0,
-                                 second: timeComp.second ?? 0,
-                                 of: sale.saleDate) ?? sale.saleDate
-        }
-        return sale.saleDate
-    }
+    var saleDate: Date { sale.saleDate }
     var totalQuantity: Int { items.reduce(0) { $0 + $1.quantity } }
     var primaryCategory: ProductCategory? { products.first?.category }
 }

@@ -3,14 +3,14 @@ import SwiftUI
 struct StaffScheduleView: View {
     let storeID: UUID
     @State private var viewModel = StaffViewModel()
-    @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    @State private var selectedDate = Date()
     enum ScheduleFilter: String, CaseIterable, Hashable {
         case morning = "Morning"
         case evening = "Evening"
         case unassigned = "Unassigned"
     }
     
-    @State private var selectedFilter: ScheduleFilter = .morning
+    @State private var selectedFilter: ScheduleFilter = .unassigned
     
     private var weekDates: [Date] {
         var dates: [Date] = []
@@ -69,41 +69,20 @@ struct StaffScheduleView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Horizontal Date Picker
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(weekDates, id: \.self) { date in
-                            DateSelectButton(
-                                date: date,
-                                isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate)
-                            ) {
-                                withAnimation {
-                                    selectedDate = date
-                                    proxy.scrollTo(date, anchor: .center)
-                                }
-                            }
-                            .id(date)
-                        }
-                    }
-                    .padding()
-                }
-                .background(Color.themeBackground)
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        // Find the exact matching date in the array to scroll to it
-                        if let match = weekDates.first(where: { Calendar.current.isDate($0, inSameDayAs: selectedDate) }) {
-                            proxy.scrollTo(match, anchor: .center)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(weekDates, id: \.self) { date in
+                        DateSelectButton(
+                            date: date,
+                            isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate)
+                        ) {
+                            selectedDate = date
                         }
                     }
                 }
-                .onChange(of: selectedDate) { newDate in
-                    if let match = weekDates.first(where: { Calendar.current.isDate($0, inSameDayAs: newDate) }) {
-                        withAnimation {
-                            proxy.scrollTo(match, anchor: .center)
-                        }
-                    }
-                }
+                .padding()
             }
+            .background(Color.themeBackground)
             
             // Shift Filter Segmented Control
             Picker("Shift Filter", selection: $selectedFilter) {
@@ -234,7 +213,7 @@ struct StaffScheduleRowView: View {
                             .foregroundColor(.primary)
                         
                         Circle()
-                            .fill((user.isActive && leave == nil) ? Color.themeAccent : Color.gray.opacity(0.5))
+                            .fill((user.isActive && leave == nil) ? Color.green : Color.gray.opacity(0.5))
                             .frame(width: 8, height: 8)
                     }
                     
@@ -269,7 +248,7 @@ struct StaffScheduleRowView: View {
             HStack(spacing: 16) {
                 HStack(spacing: 4) {
                     Image(systemName: "calendar.badge.clock")
-                        .foregroundColor(.themeAccent)
+                        .foregroundColor(.blue)
                     Text("\(apptCount) Appts")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
@@ -277,7 +256,7 @@ struct StaffScheduleRowView: View {
                 
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.square")
-                        .foregroundColor(.themeAccent)
+                        .foregroundColor(.green)
                     Text("\(tasks.filter { $0.isCompleted }.count)/\(tasks.count) Tasks")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
